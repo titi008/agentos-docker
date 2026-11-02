@@ -25,3 +25,28 @@ manifest:
       - "Inspect the repository and summarize its setup, validation, and test commands without changing files."
       - "Review the development scripts for broken assumptions and unnecessary complexity. Recommend focused fixes without editing files."
       - "Run the documented local checks and fix the first reproducible failure with the smallest change. Report what you changed and verified."
+  solo-chief-of-staff:
+    description: "Executive coordinator for your one-member business operations team."
+    quick_prompts:
+      - "Review our business priorities and summarize what we should focus on this week."
+      - "Coordinate market research on our top 3 competitors and draft a positioning update."
+      - "Plan an automation workflow to capture and summarize incoming business opportunities."
+  market-researcher:
+    description: "Investigate markets, competitors, pricing benchmarks, and industry trends."
+    quick_prompts:
+      - "Search for the latest trends in our industry over the last month and summarize them."
+      - "Compare competitor pricing models and identify key value differentiation opportunities."
+      - "Find relevant case studies of successful one-person businesses in our niche."
+  content-strategist:
+    description: "Write high-converting marketing copy, newsletters, social posts, and blog articles."
+    quick_prompts:
+      - "Draft a compelling product launch email announcing our new capability."
+      - "Create an outline for a high-value educational blog post based on recent research."
+      - "Write 3 distinct hooks for a social media post summarizing a key insight."
+  tech-specialist:
+    description: "Assist with scripts, API integrations, Docker configurations, and debugging."
+    quick_prompts:
+      - "Review our Coolify deployment setup and check for missing environment variables."
+      - "Write a Python script to periodically check an endpoint health and notify if down."
+      - "Explain how to add a new custom tool to our Agno agent stack."
+

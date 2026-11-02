@@ -9,13 +9,15 @@ from pathlib import Path
 from agno.job_queue import QueueConfig
 from agno.os import AgentOS, CompanyConfig, OSManager
 
-# from agents.engineers import create_claude_engineer
-# from agents.engineers import create_codex_engineer
+from agents.copywriter import content_strategist
+from agents.researcher import market_researcher
+from agents.tech_specialist import tech_specialist
 from app.company import products
 from app.interfaces import attach_interfaces, mcp_auth
 from app.registry import registry, shared_knowledge, shared_learning
 from app.settings import manager_model
 from db import get_postgres_db
+from teams.solo_operations import solo_operations_team
 
 runtime_env = getenv("RUNTIME_ENV", "prd")
 agentos_url = getenv("AGENTOS_URL", "http://127.0.0.1:8000")
@@ -40,9 +42,13 @@ agent_os = AgentOS(
     company=CompanyConfig(products=products, model=manager_model()),
     queue=QueueConfig(durable=True, db=db),
     knowledge=[shared_knowledge],
+    teams=[
+        solo_operations_team,
+    ],
     agents=[
-        # create_claude_engineer(),
-        # create_codex_engineer(),
+        market_researcher,
+        content_strategist,
+        tech_specialist,
     ],
     registry=registry,
     config=str(agentos_root / "app" / "config.yaml"),

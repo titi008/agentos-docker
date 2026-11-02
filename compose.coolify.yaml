@@ -1,0 +1,55 @@
+services:
+  agentos-db:
+    image: agnohq/pgvector:18
+    container_name: agentos-db
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_USER: ${DB_USER:-ai}
+      POSTGRES_PASSWORD: ${DB_PASS:-ai}
+      POSTGRES_DB: ${DB_DATABASE:-ai}
+    networks:
+      - agentos
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ai} -d ${DB_DATABASE:-ai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  agentos-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agentos
+    container_name: agentos-api
+    image: ${IMAGE_NAME:-agentos}:${IMAGE_TAG:-latest}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    environment:
+      RUNTIME_ENV: ${RUNTIME_ENV:-prd}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      AGNO_DEBUG: "False"
+      WAIT_FOR_DB: "True"
+      AGENTOS_URL: ${AGENTOS_URL}
+      JWT_VERIFICATION_KEY: ${JWT_VERIFICATION_KEY:-}
+      MCP_CONNECT_SECRET: ${MCP_CONNECT_SECRET:-}
+      DB_HOST: agentos-db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-ai}
+      DB_PASS: ${DB_PASS:-ai}
+      DB_DATABASE: ${DB_DATABASE:-ai}
+    depends_on:
+      agentos-db:
+        condition: service_healthy
+    networks:
+      - agentos
+    labels:
+      - "coolify.managed=true"
+
+networks:
+  agentos:
+
+volumes:
+  pgdata:
