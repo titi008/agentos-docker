@@ -28,8 +28,13 @@ services:
     restart: unless-stopped
     environment:
       RUNTIME_ENV: ${RUNTIME_ENV:-prd}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      MODEL_PROVIDER: ${MODEL_PROVIDER:-gemini}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6.1-sol}
       AGNO_DEBUG: "False"
       WAIT_FOR_DB: "True"
       AGENTOS_URL: ${AGENTOS_URL}

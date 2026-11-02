@@ -31,7 +31,7 @@ def default_model() -> Any:
         model_id = getenv("GEMINI_MODEL", "gemini-3.8-flash")
         return Gemini(id=model_id)
 
-    model_id = getenv("OPENAI_MODEL", "gpt-4o")
+    model_id = getenv("OPENAI_MODEL", "gpt-6.1-sol")
     return OpenAIResponses(id=model_id)
 
 
@@ -44,31 +44,29 @@ def get_available_models() -> list[Any]:
     """Palette of models available in the Agno Studio UI dropdown."""
     models: list[Any] = []
 
-    # Anthropic latest models
+    # Anthropic latest generation
     models.extend(
         [
             Claude(id="claude-sonnet-5-5"),
             Claude(id="claude-opus-5-5"),
             Claude(id="claude-haiku-5-5"),
-            Claude(id="claude-3-7-sonnet-latest"),
         ]
     )
 
-    # Google Gemini latest models
+    # Google Gemini latest generation
     models.extend(
         [
             Gemini(id="gemini-3.8-flash"),
+            Gemini(id="gemini-3.8-live"),
             Gemini(id="gemini-3.1-pro"),
-            Gemini(id="gemini-2.5-pro"),
-            Gemini(id="gemini-2.5-flash"),
+            Gemini(id="gemini-3.0-pro"),
         ]
     )
 
-    # OpenAI models
+    # OpenAI latest generation
     models.extend(
         [
-            OpenAIResponses(id="gpt-4o"),
-            OpenAIResponses(id="gpt-4o-mini"),
+            OpenAIResponses(id="gpt-6.1-sol"),
         ]
     )
 

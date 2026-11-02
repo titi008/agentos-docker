@@ -45,9 +45,15 @@ This guide walks you through deploying your self-hosted **Agno AgentOS** instanc
 In Coolify's **Environment Variables** tab, define:
 
 ```env
-# Required: LLM Provider
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o
+# LLM Provider (Choose Anthropic, Gemini, or OpenAI)
+MODEL_PROVIDER=gemini
+GEMINI_API_KEY=AIzaSy...
+GEMINI_MODEL=gemini-3.8-flash
+
+# Or if using Anthropic:
+# MODEL_PROVIDER=anthropic
+# ANTHROPIC_API_KEY=sk-ant-...
+# ANTHROPIC_MODEL=claude-sonnet-5-5
 
 # Public URL of this AgentOS instance
 AGENTOS_URL=https://agentos.yourdomain.com
