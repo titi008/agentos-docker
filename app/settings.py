@@ -56,10 +56,9 @@ def get_available_models() -> list[Any]:
     # Google Gemini latest generation
     models.extend(
         [
+            Gemini(id="gemini-4-argon"),
             Gemini(id="gemini-3.8-flash"),
             Gemini(id="gemini-3.8-live"),
-            Gemini(id="gemini-3.1-pro"),
-            Gemini(id="gemini-3.0-pro"),
         ]
     )
 
