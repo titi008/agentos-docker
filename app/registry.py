@@ -14,7 +14,7 @@ from agno.tools.mcp import MCPTools
 from agno.tools.parallel import ParallelTools
 from agno.workflow.functions import content_to_file, csv_to_markdown_table, extract_json, extract_urls, json_to_csv
 
-from app.settings import default_model
+from app.settings import get_available_models
 from db import create_knowledge, get_postgres_db
 
 
@@ -53,7 +53,7 @@ registry = Registry(
         FileGenerationTools(enable_pdf_generation=True, enable_docx_generation=False),
         CalculatorTools(),
     ],
-    models=[default_model()],
+    models=get_available_models(),
     functions=[
         extract_json,
         extract_urls,
