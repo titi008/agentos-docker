@@ -3,6 +3,7 @@
 from agno.eval import Case
 
 from app.main import agent_os
+from teams.solo_operations import solo_operations_team
 
 CASES = (
     Case(
@@ -36,5 +37,16 @@ CASES = (
         "enabled stores or claim a successful live learning test.",
         expected_tool_calls=("read_file",),
         tags=("smoke",),
+    ),
+    # --- Your cases — authored by /create-evals ---
+    Case(
+        name="solo_chief_delegates_to_specialists",
+        team=solo_operations_team,
+        input="We are planning our Q3 marketing strategy. "
+        "Coordinate research and copywriting into actionable recommendations.",
+        criteria="Deconstruct the request, coordinate with specialist team members, and synthesize the result "
+        "into clear, actionable steps for the founder.",
+        tags=("smoke",),
+        timeout_seconds=90,
     ),
 )
