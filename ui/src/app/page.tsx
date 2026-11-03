@@ -1,6 +1,7 @@
 'use client'
 import Sidebar from '@/components/chat/Sidebar/Sidebar'
 import { ChatArea } from '@/components/chat/ChatArea'
+import { StudioView } from '@/components/views/StudioView'
 import { ObservabilityView } from '@/components/views/ObservabilityView'
 import { KnowledgeMemoryView } from '@/components/views/KnowledgeMemoryView'
 import { OperationsView } from '@/components/views/OperationsView'
@@ -17,6 +18,7 @@ export default function Home() {
       <div className="flex h-screen bg-background/80 overflow-hidden">
         <Sidebar hasEnvToken={hasEnvToken} envToken={envToken} />
         {activeView === 'chat' && <ChatArea />}
+        {activeView === 'studio' && <StudioView />}
         {activeView === 'observability' && <ObservabilityView />}
         {activeView === 'knowledge' && <KnowledgeMemoryView />}
         {activeView === 'operations' && <OperationsView />}

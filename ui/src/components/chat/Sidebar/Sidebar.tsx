@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import { useQueryState } from 'nuqs'
 import { truncateText } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MessageSquare, Activity, Brain, Briefcase } from 'lucide-react'
+import { MessageSquare, Activity, Brain, Briefcase, LayoutGrid } from 'lucide-react'
 import { getApprovalsCountAPI } from '@/api/os'
 
 const ENDPOINT_PLACEHOLDER = 'NO ENDPOINT ADDED'
@@ -230,6 +230,7 @@ const Sidebar = ({
   const [isMounted, setIsMounted] = useState(false)
   const [agentId] = useQueryState('agent')
   const [teamId] = useQueryState('team')
+  const [workflowId] = useQueryState('workflow')
 
   useEffect(() => {
     setIsMounted(true)
@@ -306,6 +307,17 @@ const Sidebar = ({
             <MessageSquare className="size-3.5" />
           </button>
           <button
+            onClick={() => setActiveView('studio')}
+            title="Studio (Agents, Teams, Workflows, Registry)"
+            className={`flex flex-1 items-center justify-center rounded-lg py-1.5 transition ${
+              activeView === 'studio'
+                ? 'bg-primary text-background font-semibold shadow-sm'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <LayoutGrid className="size-3.5" />
+          </button>
+          <button
             onClick={() => setActiveView('observability')}
             title="Observability & Traces"
             className={`flex flex-1 items-center justify-center rounded-lg py-1.5 transition ${
@@ -380,7 +392,7 @@ const Sidebar = ({
                     <>
                       <ModeSelector />
                       <EntitySelector />
-                      {selectedModel && (agentId || teamId) && (
+                      {selectedModel && (agentId || teamId || workflowId) && (
                         <ModelDisplay model={selectedModel} />
                       )}
                     </>

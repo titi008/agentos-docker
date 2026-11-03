@@ -12,13 +12,17 @@ import {
   getKnowledgeContentAPI,
   uploadKnowledgeTextAPI,
   deleteKnowledgeContentAPI,
-  searchKnowledgeAPI
+  searchKnowledgeAPI,
+  getFilesystemFilesAPI,
+  getFilesystemContentAPI
 } from '@/api/os'
 import {
   UserMemorySchema,
   LearningResponse,
   ContentResponseSchema,
-  VectorSearchResult
+  VectorSearchResult,
+  FileSystemTableEntry,
+  FileSystemContentResponse
 } from '@/types/os'
 import {
   Brain,
@@ -34,7 +38,10 @@ import {
   CheckCircle2,
   Sparkles,
   Tag,
-  BookOpen
+  BookOpen,
+  Folder,
+  Eye,
+  Copy
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -42,7 +49,7 @@ import { toast } from 'sonner'
 
 dayjs.extend(relativeTime)
 
-type KnowledgeMemoryTab = 'memories' | 'learnings' | 'knowledge'
+type KnowledgeMemoryTab = 'memories' | 'learnings' | 'knowledge' | 'filesystem'
 
 export const KnowledgeMemoryView = () => {
   const { selectedEndpoint, authToken, userId } = useStore()
@@ -77,6 +84,30 @@ export const KnowledgeMemoryView = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<VectorSearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
+
+  // Filesystem state
+  const [files, setFiles] = useState<FileSystemTableEntry[]>([])
+  const [isFilesLoading, setIsFilesLoading] = useState(false)
+  const [fileSearch, setFileSearch] = useState('')
+  const [selectedFileContent, setSelectedFileContent] =
+    useState<FileSystemContentResponse | null>(null)
+  const [isContentLoading, setIsContentLoading] = useState(false)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+
+  const fetchFiles = useCallback(async () => {
+    if (!selectedEndpoint) return
+    setIsFilesLoading(true)
+    try {
+      const res = await getFilesystemFilesAPI(
+        selectedEndpoint,
+        { query: fileSearch || undefined },
+        authToken
+      )
+      setFiles(res)
+    } finally {
+      setIsFilesLoading(false)
+    }
+  }, [selectedEndpoint, authToken, fileSearch])
 
   const fetchMemories = useCallback(async () => {
     if (!selectedEndpoint) return
@@ -120,7 +151,27 @@ export const KnowledgeMemoryView = () => {
     if (activeTab === 'memories') fetchMemories()
     if (activeTab === 'learnings') fetchLearnings()
     if (activeTab === 'knowledge') fetchKnowledge()
-  }, [activeTab, fetchMemories, fetchLearnings, fetchKnowledge])
+    if (activeTab === 'filesystem') fetchFiles()
+  }, [activeTab, fetchMemories, fetchLearnings, fetchKnowledge, fetchFiles])
+
+  const handleViewFile = async (entry: FileSystemTableEntry) => {
+    setIsContentLoading(true)
+    setIsPreviewOpen(true)
+    try {
+      const content = await getFilesystemContentAPI(
+        selectedEndpoint,
+        {
+          path: entry.path,
+          namespace: entry.namespace,
+          agentId: entry.agent_ids?.[0]
+        },
+        authToken
+      )
+      setSelectedFileContent(content)
+    } finally {
+      setIsContentLoading(false)
+    }
+  }
 
   const handleSaveMemory = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -275,6 +326,16 @@ export const KnowledgeMemoryView = () => {
             }`}
           >
             <Database className="size-3.5" /> Vector Knowledge Base
+          </button>
+          <button
+            onClick={() => setActiveTab('filesystem')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+              activeTab === 'filesystem'
+                ? 'bg-primary text-background font-semibold shadow-sm'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <Folder className="size-3.5" /> Shared Notes & Files
           </button>
         </div>
       </div>
@@ -619,6 +680,119 @@ export const KnowledgeMemoryView = () => {
             </div>
           </div>
         )}
+
+        {/* FILESYSTEM TAB */}
+        {activeTab === 'filesystem' && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 size-3.5 text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search file path or contents..."
+                    value={fileSearch}
+                    onChange={(e) => setFileSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') fetchFiles()
+                    }}
+                    className="h-9 w-72 rounded-xl border border-primary/15 bg-accent/40 pl-9 pr-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={() => fetchFiles()}
+                  className="flex h-9 items-center gap-1.5 rounded-xl border border-primary/15 bg-accent/30 px-3 text-xs text-muted hover:text-foreground"
+                >
+                  <Search className="size-3.5" /> Search
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fetchFiles()}
+                  disabled={isFilesLoading}
+                  className="flex h-9 items-center gap-1.5 rounded-xl border border-primary/15 bg-accent/30 px-3 text-xs text-muted hover:text-foreground disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${isFilesLoading ? 'animate-spin' : ''}`}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Files List */}
+            {isFilesLoading ? (
+              <div className="p-8 text-center text-xs text-muted">
+                Loading files from agent filesystem...
+              </div>
+            ) : files.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-primary/15 p-12 text-center">
+                <Folder className="mx-auto size-8 text-muted/50 mb-3" />
+                <p className="text-xs text-muted">
+                  No files or notes found in the virtual filesystem.
+                </p>
+                <p className="mt-1 text-[11px] text-muted/70">
+                  When agents save notes, markdown reports, or data with{' '}
+                  <code className="text-primary font-semibold">shared_notes</code>
+                  , they will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-primary/15 bg-accent/20">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-primary/10 bg-accent/50 text-[11px] uppercase text-muted">
+                    <tr>
+                      <th className="px-4 py-3">Path</th>
+                      <th className="px-4 py-3">Namespace</th>
+                      <th className="px-4 py-3">Holders / Agents</th>
+                      <th className="px-4 py-3">Size</th>
+                      <th className="px-4 py-3">Updated</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-primary/5">
+                    {files.map((file, idx) => (
+                      <tr
+                        key={`${file.namespace}-${file.path}-${idx}`}
+                        className="hover:bg-primary/5 transition"
+                      >
+                        <td className="px-4 py-3 font-semibold text-primary flex items-center gap-2">
+                          <FileText className="size-3.5 shrink-0 text-muted" />
+                          <span>{file.path}</span>
+                        </td>
+                        <td className="px-4 py-3 text-muted">
+                          <span className="rounded bg-accent px-2 py-0.5 text-[10px] text-zinc-300 font-mono">
+                            {file.namespace}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted">
+                          {file.agent_ids?.join(', ') || 'Global'}
+                        </td>
+                        <td className="px-4 py-3 text-muted font-mono text-[11px]">
+                          {file.size_bytes ? `${file.size_bytes} B` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-muted text-[11px]">
+                          {file.updated_at
+                            ? dayjs.unix(file.updated_at).fromNow()
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleViewFile(file)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-primary/15 bg-accent/40 px-2.5 py-1 text-[11px] text-primary hover:bg-primary/10"
+                          >
+                            <Eye className="size-3" /> View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Create / Edit Memory Modal */}
@@ -746,6 +920,84 @@ export const KnowledgeMemoryView = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* File Preview Modal */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="flex flex-col w-full max-w-3xl max-h-[85vh] rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <FileText className="size-4" />
+                  {selectedFileContent?.path || 'File Preview'}
+                </h3>
+                <span className="text-[11px] text-muted">
+                  Namespace: {selectedFileContent?.namespace || 'shared-notes'}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsPreviewOpen(false)
+                  setSelectedFileContent(null)
+                }}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto my-4 rounded-xl border border-primary/15 bg-accent/20 p-4">
+              {isContentLoading ? (
+                <div className="p-8 text-center text-xs text-muted">
+                  Reading file content...
+                </div>
+              ) : selectedFileContent?.content ? (
+                <pre className="text-xs text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed select-text">
+                  {selectedFileContent.content}
+                </pre>
+              ) : (
+                <div className="p-8 text-center text-xs text-muted">
+                  File is empty.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-primary/15 pt-3 text-xs text-muted">
+              <div>
+                {selectedFileContent && (
+                  <span>
+                    {selectedFileContent.line_count} line(s) •{' '}
+                    {selectedFileContent.size_bytes} byte(s)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedFileContent?.content && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedFileContent.content)
+                      toast.success('Copied file content to clipboard')
+                    }}
+                    className="flex items-center gap-1 rounded-xl border border-primary/15 px-3 py-1.5 text-xs text-muted hover:text-foreground"
+                  >
+                    <Copy className="size-3.5" /> Copy Content
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPreviewOpen(false)
+                    setSelectedFileContent(null)
+                  }}
+                  className="rounded-xl bg-primary px-4 py-1.5 text-xs font-semibold text-background hover:bg-primary/90"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -72,5 +72,44 @@ export const APIRoutes = {
   GetCompanyTasks: (agentOSUrl: string) => `${agentOSUrl}/company/tasks`,
   CreateCompanyTask: (agentOSUrl: string) => `${agentOSUrl}/company/tasks`,
   TransitionCompanyTask: (agentOSUrl: string, taskId: string) =>
-    `${agentOSUrl}/company/tasks/${taskId}/transitions`
+    `${agentOSUrl}/company/tasks/${taskId}/transitions`,
+
+  // Workflows
+  GetWorkflows: (agentOSUrl: string) => `${agentOSUrl}/workflows`,
+  GetWorkflow: (agentOSUrl: string, workflowId: string) =>
+    `${agentOSUrl}/workflows/${workflowId}`,
+  WorkflowRun: (agentOSUrl: string, workflowId: string) =>
+    `${agentOSUrl}/workflows/${workflowId}/runs`,
+  GetWorkflowRuns: (agentOSUrl: string, workflowId: string) =>
+    `${agentOSUrl}/workflows/${workflowId}/runs`,
+
+  // Studio Components
+  GetComponents: (agentOSUrl: string) => `${agentOSUrl}/components`,
+  CreateComponent: (agentOSUrl: string) => `${agentOSUrl}/components`,
+  GetComponent: (agentOSUrl: string, componentId: string) =>
+    `${agentOSUrl}/components/${componentId}`,
+  UpdateComponent: (agentOSUrl: string, componentId: string) =>
+    `${agentOSUrl}/components/${componentId}`,
+  DeleteComponent: (agentOSUrl: string, componentId: string) =>
+    `${agentOSUrl}/components/${componentId}`,
+  GetComponentConfigs: (agentOSUrl: string, componentId: string) =>
+    `${agentOSUrl}/components/${componentId}/configs`,
+  CreateComponentConfig: (agentOSUrl: string, componentId: string) =>
+    `${agentOSUrl}/components/${componentId}/configs`,
+  SetCurrentComponentConfig: (
+    agentOSUrl: string,
+    componentId: string,
+    version: number | string
+  ) => `${agentOSUrl}/components/${componentId}/configs/${version}/set-current`,
+
+  // Registry
+  GetRegistry: (agentOSUrl: string) => `${agentOSUrl}/registry`,
+
+  // Filesystem
+  GetFilesystemFiles: (agentOSUrl: string) => `${agentOSUrl}/filesystem/files`,
+  GetFilesystemEntries: (agentOSUrl: string) =>
+    `${agentOSUrl}/filesystem/entries`,
+  GetFilesystemContent: (agentOSUrl: string) =>
+    `${agentOSUrl}/filesystem/content`,
+  SearchFilesystem: (agentOSUrl: string) => `${agentOSUrl}/filesystem/search`
 }

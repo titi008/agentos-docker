@@ -29,7 +29,6 @@ import {
   X,
   ChevronRight,
   ChevronDown,
-  Terminal,
   Zap,
   Sparkles
 } from 'lucide-react'
@@ -683,26 +682,32 @@ export const ObservabilityView = () => {
       </div>
 
       {/* Trace Detail Modal / Drawer */}
-      {selectedTrace && (
+      {(selectedTrace || isDetailLoading) && (
         <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-sm">
           <div className="flex h-full w-full max-w-2xl flex-col border-l border-primary/20 bg-background p-6 shadow-2xl overflow-hidden font-dmmono">
-            <div className="flex items-center justify-between border-b border-primary/15 pb-4">
-              <div>
-                <span className="text-[10px] uppercase text-muted">
-                  Execution Trace
-                </span>
-                <h3 className="text-base font-semibold text-primary">
-                  {selectedTrace.name}
-                </h3>
+            {isDetailLoading || !selectedTrace ? (
+              <div className="flex flex-1 items-center justify-center text-xs text-muted">
+                Loading trace details...
               </div>
-              <button
-                onClick={() => setSelectedTrace(null)}
-                className="rounded-lg p-1 text-muted hover:text-foreground"
-                aria-label="Close trace details"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-primary/15 pb-4">
+                  <div>
+                    <span className="text-[10px] uppercase text-muted">
+                      Execution Trace
+                    </span>
+                    <h3 className="text-base font-semibold text-primary">
+                      {selectedTrace.name}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTrace(null)}
+                    className="rounded-lg p-1 text-muted hover:text-foreground"
+                    aria-label="Close trace details"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </div>
 
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
               {/* Trace Metadata Bar */}
@@ -749,6 +754,8 @@ export const ObservabilityView = () => {
                 )}
               </div>
             </div>
+            </>
+            )}
           </div>
         </div>
       )}

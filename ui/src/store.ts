@@ -5,6 +5,7 @@ import {
   AgentDetails,
   SessionEntry,
   TeamDetails,
+  WorkflowSummaryResponse,
   type ChatMessage
 } from '@/types/os'
 
@@ -42,10 +43,12 @@ interface Store {
   setAgents: (agents: AgentDetails[]) => void
   teams: TeamDetails[]
   setTeams: (teams: TeamDetails[]) => void
+  workflows: WorkflowSummaryResponse[]
+  setWorkflows: (workflows: WorkflowSummaryResponse[]) => void
   selectedModel: string
   setSelectedModel: (model: string) => void
-  mode: 'agent' | 'team'
-  setMode: (mode: 'agent' | 'team') => void
+  mode: 'agent' | 'team' | 'workflow'
+  setMode: (mode: 'agent' | 'team' | 'workflow') => void
   sessionsData: SessionEntry[] | null
   setSessionsData: (
     sessionsData:
@@ -54,9 +57,9 @@ interface Store {
   ) => void
   isSessionsLoading: boolean
   setIsSessionsLoading: (isSessionsLoading: boolean) => void
-  activeView: 'chat' | 'observability' | 'knowledge' | 'operations'
+  activeView: 'chat' | 'observability' | 'knowledge' | 'operations' | 'studio'
   setActiveView: (
-    view: 'chat' | 'observability' | 'knowledge' | 'operations'
+    view: 'chat' | 'observability' | 'knowledge' | 'operations' | 'studio'
   ) => void
   pendingApprovalsCount: number
   setPendingApprovalsCount: (count: number) => void
@@ -98,6 +101,8 @@ export const useStore = create<Store>()(
       setAgents: (agents) => set({ agents }),
       teams: [],
       setTeams: (teams) => set({ teams }),
+      workflows: [],
+      setWorkflows: (workflows) => set({ workflows }),
       selectedModel: '',
       setSelectedModel: (selectedModel) => set(() => ({ selectedModel })),
       mode: 'agent',

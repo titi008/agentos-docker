@@ -15,7 +15,8 @@ import { useEffect } from 'react'
 import useChatActions from '@/hooks/useChatActions'
 
 export function EntitySelector() {
-  const { mode, agents, teams, setMessages, setSelectedModel } = useStore()
+  const { mode, agents, teams, workflows, setMessages, setSelectedModel } =
+    useStore()
 
   const { focusChatInput } = useChatActions()
   const [agentId, setAgentId] = useQueryState('agent', {
@@ -26,23 +27,37 @@ export function EntitySelector() {
     parse: (value) => value || undefined,
     history: 'push'
   })
+  const [workflowId, setWorkflowId] = useQueryState('workflow', {
+    parse: (value) => value || undefined,
+    history: 'push'
+  })
   const [, setSessionId] = useQueryState('session')
 
-  const currentEntities = mode === 'team' ? teams : agents
-  const currentValue = mode === 'team' ? teamId : agentId
-  const placeholder = mode === 'team' ? 'Select Team' : 'Select Agent'
+  const currentEntities =
+    mode === 'workflow' ? workflows : mode === 'team' ? teams : agents
+  const currentValue =
+    mode === 'workflow' ? workflowId : mode === 'team' ? teamId : agentId
+  const placeholder =
+    mode === 'workflow'
+      ? 'Select Workflow'
+      : mode === 'team'
+        ? 'Select Team'
+        : 'Select Agent'
 
   useEffect(() => {
     if (currentValue && currentEntities.length > 0) {
       const entity = currentEntities.find((item) => item.id === currentValue)
       if (entity) {
-        setSelectedModel(entity.model?.model || '')
-        if (mode === 'team') {
-          setTeamId(entity.id)
+        if (mode === 'workflow') {
+          setWorkflowId(entity.id)
+          setSelectedModel('Workflow Pipeline')
+        } else {
+          setSelectedModel((entity as { model?: { model?: string } }).model?.model || '')
+          if (mode === 'team') {
+            setTeamId(entity.id)
+          }
         }
-        if (entity.model?.model) {
-          focusChatInput()
-        }
+        focusChatInput()
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,22 +67,30 @@ export function EntitySelector() {
     const newValue = value === currentValue ? null : value
     const selectedEntity = currentEntities.find((item) => item.id === newValue)
 
-    setSelectedModel(selectedEntity?.model?.provider || '')
-
-    if (mode === 'team') {
+    if (mode === 'workflow') {
+      setWorkflowId(newValue)
+      setAgentId(null)
+      setTeamId(null)
+      setSelectedModel('Workflow Pipeline')
+    } else if (mode === 'team') {
       setTeamId(newValue)
       setAgentId(null)
+      setWorkflowId(null)
+      setSelectedModel(
+        (selectedEntity as { model?: { provider?: string } })?.model?.provider || ''
+      )
     } else {
       setAgentId(newValue)
       setTeamId(null)
+      setWorkflowId(null)
+      setSelectedModel(
+        (selectedEntity as { model?: { provider?: string } })?.model?.provider || ''
+      )
     }
 
     setMessages([])
     setSessionId(null)
-
-    if (selectedEntity?.model?.provider) {
-      focusChatInput()
-    }
+    focusChatInput()
   }
 
   if (currentEntities.length === 0) {

@@ -20,7 +20,15 @@ import {
   ApprovalResponse,
   CompanyProduct,
   CompanyProject,
-  CompanyTask
+  CompanyTask,
+  WorkflowSummaryResponse,
+  ComponentResponse,
+  ComponentConfigResponse,
+  ComponentCreatePayload,
+  ConfigCreatePayload,
+  RegistryContentResponse,
+  FileSystemTableEntry,
+  FileSystemContentResponse
 } from '@/types/os'
 
 // Helper function to create headers with optional auth token and deterministic user ID
@@ -75,7 +83,7 @@ export const getStatusAPI = async (
 
 export const getAllSessionsAPI = async (
   base: string,
-  type: 'agent' | 'team',
+  type: 'agent' | 'team' | 'workflow',
   componentId: string,
   dbId: string,
   authToken?: string,
@@ -109,7 +117,7 @@ export const getAllSessionsAPI = async (
 
 export const getSessionAPI = async (
   base: string,
-  type: 'agent' | 'team',
+  type: 'agent' | 'team' | 'workflow',
   sessionId: string,
   dbId?: string,
   authToken?: string,
@@ -894,5 +902,304 @@ export const transitionCompanyTaskAPI = async (
   } catch {
     toast.error('Error transitioning task')
     return false
+  }
+}
+
+// Workflows
+export const getWorkflowsAPI = async (
+  endpoint: string,
+  authToken?: string
+): Promise<WorkflowSummaryResponse[]> => {
+  try {
+    const response = await fetch(APIRoutes.GetWorkflows(endpoint), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return []
+    const data = await response.json()
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+export const getWorkflowAPI = async (
+  endpoint: string,
+  workflowId: string,
+  authToken?: string
+): Promise<WorkflowSummaryResponse | null> => {
+  try {
+    const response = await fetch(APIRoutes.GetWorkflow(endpoint, workflowId), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+// Components (Studio)
+export const getComponentsAPI = async (
+  endpoint: string,
+  componentType?: 'agent' | 'team' | 'workflow',
+  authToken?: string
+): Promise<ComponentResponse[]> => {
+  try {
+    const url = new URL(APIRoutes.GetComponents(endpoint))
+    if (componentType) url.searchParams.set('component_type', componentType)
+    url.searchParams.set('limit', '100')
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return []
+    const json = await response.json()
+    return json.data || (Array.isArray(json) ? json : [])
+  } catch {
+    return []
+  }
+}
+
+export const getComponentAPI = async (
+  endpoint: string,
+  componentId: string,
+  authToken?: string
+): Promise<ComponentResponse | null> => {
+  try {
+    const response = await fetch(APIRoutes.GetComponent(endpoint, componentId), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+export const createComponentAPI = async (
+  endpoint: string,
+  payload: ComponentCreatePayload,
+  authToken?: string
+): Promise<ComponentResponse | null> => {
+  try {
+    const response = await fetch(APIRoutes.CreateComponent(endpoint), {
+      method: 'POST',
+      headers: createHeaders(authToken),
+      body: JSON.stringify(payload)
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      toast.error(err.detail || 'Failed to create component')
+      return null
+    }
+    toast.success(`Component '${payload.name}' created`)
+    return await response.json()
+  } catch {
+    toast.error('Error creating component')
+    return null
+  }
+}
+
+export const updateComponentAPI = async (
+  endpoint: string,
+  componentId: string,
+  payload: Partial<ComponentCreatePayload>,
+  authToken?: string
+): Promise<boolean> => {
+  try {
+    const response = await fetch(APIRoutes.UpdateComponent(endpoint, componentId), {
+      method: 'PATCH',
+      headers: createHeaders(authToken),
+      body: JSON.stringify(payload)
+    })
+    if (!response.ok) {
+      toast.error('Failed to update component')
+      return false
+    }
+    toast.success('Component updated')
+    return true
+  } catch {
+    toast.error('Error updating component')
+    return false
+  }
+}
+
+export const deleteComponentAPI = async (
+  endpoint: string,
+  componentId: string,
+  authToken?: string
+): Promise<boolean> => {
+  try {
+    const response = await fetch(APIRoutes.DeleteComponent(endpoint, componentId), {
+      method: 'DELETE',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) {
+      toast.error('Failed to delete component')
+      return false
+    }
+    toast.success('Component deleted')
+    return true
+  } catch {
+    toast.error('Error deleting component')
+    return false
+  }
+}
+
+export const getComponentConfigsAPI = async (
+  endpoint: string,
+  componentId: string,
+  authToken?: string
+): Promise<ComponentConfigResponse[]> => {
+  try {
+    const response = await fetch(
+      APIRoutes.GetComponentConfigs(endpoint, componentId),
+      {
+        method: 'GET',
+        headers: createHeaders(authToken)
+      }
+    )
+    if (!response.ok) return []
+    const json = await response.json()
+    return Array.isArray(json) ? json : json.data || []
+  } catch {
+    return []
+  }
+}
+
+export const createComponentConfigAPI = async (
+  endpoint: string,
+  componentId: string,
+  payload: ConfigCreatePayload,
+  authToken?: string
+): Promise<ComponentConfigResponse | null> => {
+  try {
+    const response = await fetch(
+      APIRoutes.CreateComponentConfig(endpoint, componentId),
+      {
+        method: 'POST',
+        headers: createHeaders(authToken),
+        body: JSON.stringify(payload)
+      }
+    )
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      toast.error(err.detail || 'Failed to save configuration')
+      return null
+    }
+    toast.success('New version published')
+    return await response.json()
+  } catch {
+    toast.error('Error saving version')
+    return null
+  }
+}
+
+export const setCurrentComponentConfigAPI = async (
+  endpoint: string,
+  componentId: string,
+  version: number | string,
+  authToken?: string
+): Promise<boolean> => {
+  try {
+    const response = await fetch(
+      APIRoutes.SetCurrentComponentConfig(endpoint, componentId, version),
+      {
+        method: 'POST',
+        headers: createHeaders(authToken),
+        body: JSON.stringify({})
+      }
+    )
+    if (!response.ok) {
+      toast.error('Failed to activate version')
+      return false
+    }
+    toast.success(`Activated version v${version}`)
+    return true
+  } catch {
+    toast.error('Error activating version')
+    return false
+  }
+}
+
+// Registry
+export const getRegistryAPI = async (
+  endpoint: string,
+  resourceType?: string,
+  name?: string,
+  authToken?: string
+): Promise<RegistryContentResponse[]> => {
+  try {
+    const url = new URL(APIRoutes.GetRegistry(endpoint))
+    if (resourceType && resourceType !== 'all') {
+      url.searchParams.set('resource_type', resourceType)
+    }
+    if (name) url.searchParams.set('name', name)
+    url.searchParams.set('limit', '100')
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return []
+    const json = await response.json()
+    return json.data || (Array.isArray(json) ? json : [])
+  } catch {
+    return []
+  }
+}
+
+// Filesystem
+export const getFilesystemFilesAPI = async (
+  endpoint: string,
+  options?: {
+    agentId?: string
+    namespace?: string
+    query?: string
+  },
+  authToken?: string
+): Promise<FileSystemTableEntry[]> => {
+  try {
+    const url = new URL(APIRoutes.GetFilesystemFiles(endpoint))
+    if (options?.agentId) url.searchParams.set('agent_id', options.agentId)
+    if (options?.namespace) url.searchParams.set('namespace', options.namespace)
+    if (options?.query) url.searchParams.set('query', options.query)
+    url.searchParams.set('limit', '100')
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return []
+    const json = await response.json()
+    return json.entries || []
+  } catch {
+    return []
+  }
+}
+
+export const getFilesystemContentAPI = async (
+  endpoint: string,
+  params: {
+    path: string
+    namespace?: string
+    agentId?: string
+  },
+  authToken?: string
+): Promise<FileSystemContentResponse | null> => {
+  try {
+    const url = new URL(APIRoutes.GetFilesystemContent(endpoint))
+    url.searchParams.set('path', params.path)
+    if (params.namespace) url.searchParams.set('namespace', params.namespace)
+    if (params.agentId) url.searchParams.set('agent_id', params.agentId)
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
   }
 }

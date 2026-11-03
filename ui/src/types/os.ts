@@ -112,7 +112,26 @@ export enum RunEvent {
   TeamReasoningStep = 'TeamReasoningStep',
   TeamReasoningCompleted = 'TeamReasoningCompleted',
   TeamMemoryUpdateStarted = 'TeamMemoryUpdateStarted',
-  TeamMemoryUpdateCompleted = 'TeamMemoryUpdateCompleted'
+  TeamMemoryUpdateCompleted = 'TeamMemoryUpdateCompleted',
+  // Workflow Events
+  WorkflowStarted = 'WorkflowStarted',
+  WorkflowCompleted = 'WorkflowCompleted',
+  WorkflowError = 'WorkflowError',
+  WorkflowCancelled = 'WorkflowCancelled',
+  StepStarted = 'StepStarted',
+  StepCompleted = 'StepCompleted',
+  StepError = 'StepError',
+  StepOutput = 'StepOutput',
+  ParallelExecutionStarted = 'ParallelExecutionStarted',
+  ParallelExecutionCompleted = 'ParallelExecutionCompleted',
+  ConditionExecutionStarted = 'ConditionExecutionStarted',
+  ConditionExecutionCompleted = 'ConditionExecutionCompleted',
+  LoopExecutionStarted = 'LoopExecutionStarted',
+  LoopIterationStarted = 'LoopIterationStarted',
+  LoopIterationCompleted = 'LoopIterationCompleted',
+  LoopExecutionCompleted = 'LoopExecutionCompleted',
+  RouterExecutionStarted = 'RouterExecutionStarted',
+  RouterExecutionCompleted = 'RouterExecutionCompleted'
 }
 
 export interface ResponseAudio {
@@ -223,17 +242,19 @@ export interface AgentDetails {
   id: string
   name?: string
   db_id?: string
-  // Model
   model?: Model
+  role?: string
+  description?: string
+  tools?: Array<unknown>
 }
 
 export interface TeamDetails {
   id: string
   name?: string
   db_id?: string
-
-  // Model
   model?: Model
+  description?: string
+  members?: Array<unknown>
 }
 
 export interface ImageData {
@@ -553,5 +574,120 @@ export interface CompanyTask {
   executor_id?: string
   created_at?: number
   updated_at?: number
+}
+
+// Workflows
+export interface WorkflowSummaryResponse {
+  id: string
+  name?: string
+  description?: string
+  db_id?: string
+  is_factory?: boolean
+  is_component?: boolean
+  current_version?: number
+  stage?: string
+  sandboxed?: boolean
+  steps?: Array<{
+    name?: string
+    executor_type?: string
+    description?: string
+  }>
+}
+
+// Studio Components
+export interface ComponentResponse {
+  id: string
+  component_id: string
+  component_type: 'agent' | 'team' | 'workflow'
+  name?: string
+  user_id?: string
+  description?: string
+  current_version?: number
+  metadata?: Record<string, unknown>
+  created_at: number
+  updated_at?: number
+  deleted_at?: number
+}
+
+export interface ComponentConfigResponse {
+  component_id: string
+  version: number
+  label?: string
+  stage: string
+  config: Record<string, unknown>
+  notes?: string
+  created_at: number
+  updated_at?: number
+}
+
+export interface ComponentCreatePayload {
+  name: string
+  component_id?: string
+  component_type: 'agent' | 'team' | 'workflow'
+  description?: string
+  metadata?: Record<string, unknown>
+  config?: Record<string, unknown>
+  label?: string
+  stage?: 'draft' | 'published'
+  notes?: string
+  set_current?: boolean
+}
+
+export interface ConfigCreatePayload {
+  config: Record<string, unknown>
+  version?: number
+  label?: string
+  stage?: 'draft' | 'published'
+  notes?: string
+  set_current?: boolean
+}
+
+// Registry
+export interface RegistryContentResponse {
+  name: string
+  type: string
+  id?: string
+  description?: string
+  metadata?: Record<string, unknown>
+  sandboxed?: boolean
+}
+
+// Filesystem
+export interface FileSystemEntry {
+  path: string
+  type: 'file' | 'directory'
+  size_bytes?: number
+  version?: number
+  updated_at?: number
+  user_id?: string
+}
+
+export interface FileSystemTableEntry {
+  namespace: string
+  path: string
+  agent_ids: string[]
+  size_bytes?: number
+  version?: number
+  updated_at?: number
+  user_id?: string
+  snippet?: string
+  line?: number
+  match_count?: number
+}
+
+export interface FileSystemContentResponse {
+  namespace: string
+  agent_ids: string[]
+  path: string
+  content: string
+  size_bytes?: number
+  version?: number
+  updated_at?: number
+  user_id?: string
+  line_count: number
+  truncated: boolean
+  offset: number
+  limit: number
+  next_offset?: number | null
 }
 

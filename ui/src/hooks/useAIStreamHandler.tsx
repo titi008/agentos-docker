@@ -16,6 +16,7 @@ const useAIChatStreamHandler = () => {
   const { addMessage, focusChatInput } = useChatActions()
   const [agentId] = useQueryState('agent')
   const [teamId] = useQueryState('team')
+  const [workflowId] = useQueryState('workflow')
   const [sessionId, setSessionId] = useQueryState('session')
   const selectedEndpoint = useStore((state) => state.selectedEndpoint)
   const authToken = useStore((state) => state.authToken)
@@ -157,7 +158,9 @@ const useAIChatStreamHandler = () => {
 
         let RunUrl: string | null = null
 
-        if (mode === 'team' && teamId) {
+        if (mode === 'workflow' && workflowId) {
+          RunUrl = APIRoutes.WorkflowRun(endpointUrl, workflowId)
+        } else if (mode === 'team' && teamId) {
           RunUrl = APIRoutes.TeamRun(endpointUrl, teamId)
         } else if (mode === 'agent' && agentId) {
           RunUrl = APIRoutes.AgentRun(endpointUrl).replace(
@@ -168,7 +171,7 @@ const useAIChatStreamHandler = () => {
 
         if (!RunUrl) {
           updateMessagesWithErrorState()
-          setStreamingErrorMessage('Please select an agent or team first.')
+          setStreamingErrorMessage('Please select an agent, team, or workflow first.')
           setIsStreaming(false)
           return
         }
@@ -196,6 +199,7 @@ const useAIChatStreamHandler = () => {
             if (
               chunk.event === RunEvent.RunStarted ||
               chunk.event === RunEvent.TeamRunStarted ||
+              chunk.event === RunEvent.WorkflowStarted ||
               chunk.event === RunEvent.ReasoningStarted ||
               chunk.event === RunEvent.TeamReasoningStarted
             ) {
@@ -239,7 +243,8 @@ const useAIChatStreamHandler = () => {
               })
             } else if (
               chunk.event === RunEvent.RunContent ||
-              chunk.event === RunEvent.TeamRunContent
+              chunk.event === RunEvent.TeamRunContent ||
+              chunk.event === RunEvent.StepOutput
             ) {
               setMessages((prevMessages) => {
                 const newMessages = [...prevMessages]
@@ -344,12 +349,15 @@ const useAIChatStreamHandler = () => {
             } else if (
               chunk.event === RunEvent.RunError ||
               chunk.event === RunEvent.TeamRunError ||
-              chunk.event === RunEvent.TeamRunCancelled
+              chunk.event === RunEvent.WorkflowError ||
+              chunk.event === RunEvent.TeamRunCancelled ||
+              chunk.event === RunEvent.WorkflowCancelled
             ) {
               updateMessagesWithErrorState()
               const errorContent =
                 (chunk.content as string) ||
-                (chunk.event === RunEvent.TeamRunCancelled
+                (chunk.event === RunEvent.TeamRunCancelled ||
+                chunk.event === RunEvent.WorkflowCancelled
                   ? 'Run cancelled'
                   : 'Error during run')
               setStreamingErrorMessage(errorContent)
@@ -369,7 +377,8 @@ const useAIChatStreamHandler = () => {
               // No-op for now; could surface a lightweight UI indicator in the future
             } else if (
               chunk.event === RunEvent.RunCompleted ||
-              chunk.event === RunEvent.TeamRunCompleted
+              chunk.event === RunEvent.TeamRunCompleted ||
+              chunk.event === RunEvent.WorkflowCompleted
             ) {
               setMessages((prevMessages) => {
                 const newMessages = prevMessages.map((message, index) => {
@@ -456,6 +465,7 @@ const useAIChatStreamHandler = () => {
       streamResponse,
       agentId,
       teamId,
+      workflowId,
       mode,
       setStreamingErrorMessage,
       setIsStreaming,

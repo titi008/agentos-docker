@@ -41,12 +41,8 @@ import {
   Plus,
   CheckCircle2,
   XCircle,
-  Clock,
-  AlertCircle,
   X,
-  ArrowRight,
-  Check,
-  UserCheck
+  Check
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -842,6 +838,22 @@ export const OperationsView = () => {
             </div>
 
             <form onSubmit={handleCreateTask} className="mt-4 space-y-4">
+              {products.length > 0 && (
+                <div>
+                  <label className="text-xs text-muted uppercase">Company Product</label>
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+                  >
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name || p.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="text-xs text-muted uppercase">Task Title</label>
                 <input
