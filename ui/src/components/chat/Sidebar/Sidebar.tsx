@@ -15,6 +15,8 @@ import { toast } from 'sonner'
 import { useQueryState } from 'nuqs'
 import { truncateText } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { MessageSquare, Activity, Brain, Briefcase } from 'lucide-react'
+import { getApprovalsCountAPI } from '@/api/os'
 
 const ENDPOINT_PLACEHOLDER = 'NO ENDPOINT ADDED'
 const SidebarHeader = () => (
@@ -217,7 +219,12 @@ const Sidebar = ({
     selectedModel,
     hydrated,
     isEndpointLoading,
-    mode
+    mode,
+    activeView,
+    setActiveView,
+    pendingApprovalsCount,
+    setPendingApprovalsCount,
+    authToken
   } = useStore()
   const [isMounted, setIsMounted] = useState(false)
   const [agentId] = useQueryState('agent')
@@ -228,6 +235,25 @@ const Sidebar = ({
 
     if (hydrated) initialize()
   }, [selectedEndpoint, initialize, hydrated, mode])
+
+  useEffect(() => {
+    if (!isEndpointActive || !selectedEndpoint) return
+    let isSubscribed = true
+    const checkApprovals = async () => {
+      try {
+        const count = await getApprovalsCountAPI(selectedEndpoint, authToken)
+        if (isSubscribed) setPendingApprovalsCount(count)
+      } catch {
+        // fail silently for background polling
+      }
+    }
+    checkApprovals()
+    const timer = setInterval(checkApprovals, 30000)
+    return () => {
+      isSubscribed = false
+      clearInterval(timer)
+    }
+  }, [isEndpointActive, selectedEndpoint, authToken, setPendingApprovalsCount])
 
   const handleNewChat = () => {
     clearChat()
@@ -264,15 +290,71 @@ const Sidebar = ({
         }}
       >
         <SidebarHeader />
-        <NewChatButton
-          disabled={messages.length === 0}
-          onClick={handleNewChat}
-        />
+
+        {/* Workspace Views Navigation */}
+        <div className="flex w-full items-center justify-between rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs">
+          <button
+            onClick={() => setActiveView('chat')}
+            title="Chat Workspace"
+            className={`flex flex-1 items-center justify-center rounded-lg py-1.5 transition ${
+              activeView === 'chat'
+                ? 'bg-primary text-background font-semibold shadow-sm'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <MessageSquare className="size-3.5" />
+          </button>
+          <button
+            onClick={() => setActiveView('observability')}
+            title="Observability & Traces"
+            className={`flex flex-1 items-center justify-center rounded-lg py-1.5 transition ${
+              activeView === 'observability'
+                ? 'bg-primary text-background font-semibold shadow-sm'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <Activity className="size-3.5" />
+          </button>
+          <button
+            onClick={() => setActiveView('knowledge')}
+            title="Memory & Knowledge"
+            className={`flex flex-1 items-center justify-center rounded-lg py-1.5 transition ${
+              activeView === 'knowledge'
+                ? 'bg-primary text-background font-semibold shadow-sm'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <Brain className="size-3.5" />
+          </button>
+          <button
+            onClick={() => setActiveView('operations')}
+            title="Operations & Approvals"
+            className={`relative flex flex-1 items-center justify-center rounded-lg py-1.5 transition ${
+              activeView === 'operations'
+                ? 'bg-primary text-background font-semibold shadow-sm'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <Briefcase className="size-3.5" />
+            {pendingApprovalsCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white">
+                {pendingApprovalsCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeView === 'chat' && (
+          <NewChatButton
+            disabled={messages.length === 0}
+            onClick={handleNewChat}
+          />
+        )}
         {isMounted && (
           <>
             <Endpoint />
             <AuthToken hasEnvToken={hasEnvToken} envToken={envToken} />
-            {isEndpointActive && (
+            {isEndpointActive && activeView === 'chat' && (
               <>
                 <motion.div
                   className="flex w-full flex-col items-start gap-2"
@@ -304,6 +386,15 @@ const Sidebar = ({
                 </motion.div>
                 <Sessions />
               </>
+            )}
+            {isEndpointActive && activeView !== 'chat' && (
+              <div className="rounded-xl border border-primary/10 bg-accent/20 p-3 text-[11px] text-muted">
+                Viewing{' '}
+                <span className="font-semibold text-primary capitalize">
+                  {activeView}
+                </span>{' '}
+                control plane. Switch to chat anytime via the icon above.
+              </div>
             )}
           </>
         )}

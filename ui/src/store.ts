@@ -54,6 +54,12 @@ interface Store {
   ) => void
   isSessionsLoading: boolean
   setIsSessionsLoading: (isSessionsLoading: boolean) => void
+  activeView: 'chat' | 'observability' | 'knowledge' | 'operations'
+  setActiveView: (
+    view: 'chat' | 'observability' | 'knowledge' | 'operations'
+  ) => void
+  pendingApprovalsCount: number
+  setPendingApprovalsCount: (count: number) => void
 }
 
 export const useStore = create<Store>()(
@@ -104,7 +110,12 @@ export const useStore = create<Store>()(
         })),
       isSessionsLoading: false,
       setIsSessionsLoading: (isSessionsLoading) =>
-        set(() => ({ isSessionsLoading }))
+        set(() => ({ isSessionsLoading })),
+      activeView: 'chat',
+      setActiveView: (activeView) => set(() => ({ activeView })),
+      pendingApprovalsCount: 0,
+      setPendingApprovalsCount: (pendingApprovalsCount) =>
+        set(() => ({ pendingApprovalsCount }))
     }),
     {
       name: 'endpoint-storage',

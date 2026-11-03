@@ -306,3 +306,244 @@ export interface ChatEntry {
     created_at: number
   }
 }
+
+// Observability & Traces
+export interface TraceSummary {
+  trace_id: string
+  name: string
+  status: 'OK' | 'ERROR' | string
+  duration: string
+  start_time: string
+  end_time?: string
+  total_spans: number
+  error_count: number
+  input?: string
+  output?: string
+  run_id?: string
+  session_id?: string
+  user_id?: string
+  agent_id?: string
+  team_id?: string
+  workflow_id?: string
+  created_at: string
+}
+
+export interface TraceNode {
+  id: string
+  name: string
+  type: 'AGENT' | 'LLM' | 'TOOL' | 'TEAM' | 'WORKFLOW' | string
+  duration: string
+  start_time: string
+  end_time?: string
+  status: 'OK' | 'ERROR' | string
+  input?: string | null
+  output?: string | null
+  error?: string | null
+  spans?: TraceNode[]
+  step_type?: string | null
+  metadata?: Record<string, unknown> | null
+  extra_data?: Record<string, unknown> | null
+}
+
+export interface TraceDetail extends TraceSummary {
+  tree: TraceNode[]
+}
+
+export interface DayAggregatedMetrics {
+  id: string
+  agent_runs_count: number
+  agent_sessions_count: number
+  team_runs_count: number
+  team_sessions_count: number
+  workflow_runs_count: number
+  workflow_sessions_count: number
+  users_count: number
+  token_metrics?: {
+    input_tokens?: number
+    output_tokens?: number
+    total_tokens?: number
+    prompt_tokens?: number
+    completion_tokens?: number
+  }
+  model_metrics?: Array<{
+    model?: string
+    provider?: string
+    runs?: number
+    total_tokens?: number
+    input_tokens?: number
+    output_tokens?: number
+  }>
+  date: string
+}
+
+export interface MetricsResponse {
+  metrics: DayAggregatedMetrics[]
+  updated_at?: string
+}
+
+export interface EvalSchema {
+  id: string
+  agent_id?: string
+  team_id?: string
+  workflow_id?: string
+  model_id?: string
+  model_provider?: string
+  name?: string
+  evaluated_component_name?: string
+  eval_type: 'accuracy' | 'reliability' | 'performance' | string
+  eval_data: {
+    eval_status?: 'PASSED' | 'FAILED' | string
+    score?: number
+    failed_tool_calls?: string[]
+    passed_tool_calls?: string[]
+    metrics?: Record<string, unknown>
+    reason?: string
+  }
+  eval_input?: {
+    expected_tool_calls?: string[]
+    expected_output?: string
+    criteria?: string
+  }
+  created_at?: string
+  updated_at?: string
+}
+
+// Memory & Learnings
+export interface UserMemorySchema {
+  memory_id: string
+  memory: string
+  topics?: string[]
+  agent_id?: string
+  team_id?: string
+  user_id?: string
+  updated_at?: string
+}
+
+export interface UserStatsSchema {
+  user_id: string
+  total_memories: number
+  last_memory_updated_at?: string
+}
+
+export interface LearningResponse {
+  learning_id: string
+  learning_type: string
+  namespace?: string
+  user_id?: string
+  agent_id?: string
+  team_id?: string
+  session_id?: string
+  entity_id?: string
+  entity_type?: string
+  content?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+  created_at?: number
+  updated_at?: number
+}
+
+// Knowledge Base
+export interface ContentResponseSchema {
+  id: string
+  name?: string
+  description?: string
+  type?: string
+  size?: string
+  status?: 'processing' | 'completed' | 'failed' | string
+  status_message?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface VectorSearchResult {
+  id?: string
+  content: string
+  name?: string
+  meta_data?: Record<string, unknown>
+  reranking_score?: number
+}
+
+// Operations & Scheduling
+export interface ScheduleResponse {
+  id: string
+  name: string
+  description?: string
+  method: string
+  endpoint: string
+  cron_expr?: string
+  timezone: string
+  enabled: boolean
+  next_run_at?: number
+  created_at?: number
+  updated_at?: number
+}
+
+export interface ScheduleRunResponse {
+  id: string
+  schedule_id: string
+  attempt: number
+  triggered_at?: number
+  completed_at?: number
+  status: 'SUCCESS' | 'FAILED' | 'RUNNING' | string
+  error?: string
+  output?: Record<string, unknown>
+  created_at?: number
+}
+
+// Job Queue
+export interface QueueJobSchema {
+  id: string
+  component_type: string
+  component_id: string
+  session_id: string
+  job_type: string
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string
+  attempt: number
+  max_attempts: number
+  error?: string
+  created_at?: number
+  completed_at?: number
+}
+
+// Approvals
+export interface ApprovalResponse {
+  id: string
+  run_id: string
+  session_id: string
+  status: 'pending' | 'approved' | 'rejected' | string
+  source_type: string
+  approval_type?: string
+  tool_name?: string
+  tool_args?: Record<string, unknown>
+  created_at?: number
+}
+
+// Company Tasks
+export interface CompanyProduct {
+  id: string
+  name: string
+  purpose?: string
+  created_at?: number
+}
+
+export interface CompanyProject {
+  id: string
+  product_id: string
+  name: string
+  outcome?: string
+  status: 'active' | 'completed' | 'archived' | string
+  created_at?: number
+}
+
+export interface CompanyTask {
+  id: string
+  product_id: string
+  project_id?: string
+  title: string
+  brief?: string
+  status: 'backlog' | 'ready' | 'in_progress' | 'in_review' | 'done' | 'cancelled'
+  executor_type?: string
+  executor_id?: string
+  created_at?: number
+  updated_at?: number
+}
+
