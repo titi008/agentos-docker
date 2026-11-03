@@ -33,6 +33,7 @@ agent_os = AgentOS(
     user_directory=True,
     scheduler_base_url=agentos_url,
     mcp_auth=mcp_auth(agentos_url),
+    cors_allowed_origins=["*"],
     authorization=runtime_env != "dev",
     manager=OSManager(
         root=agentos_root,

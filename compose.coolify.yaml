@@ -53,6 +53,22 @@ services:
     labels:
       - "coolify.managed=true"
 
+  agentos-ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: agentos-ui
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${AGENTOS_URL:-https://agentos.lasttokens.dev}
+    depends_on:
+      - agentos-api
+    networks:
+      - agentos
+    labels:
+      - "coolify.managed=true"
+
 networks:
   agentos:
 
