@@ -194,6 +194,13 @@ export interface ReasoningMessage {
   }
   created_at?: number
 }
+
+export interface AttachedFileMeta {
+  name: string
+  size: number
+  type: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'agent' | 'system' | 'tool'
   content: string
@@ -209,6 +216,7 @@ export interface ChatMessage {
   videos?: VideoData[]
   audio?: AudioData[]
   response_audio?: ResponseAudio
+  files?: AttachedFileMeta[]
 }
 
 export interface AgentDetails {

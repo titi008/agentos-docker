@@ -124,9 +124,21 @@ const useAIChatStreamHandler = () => {
         return prevMessages
       })
 
+      const attachedFiles = formData
+        .getAll('files')
+        .filter((item): item is File => item instanceof File)
+      const fileMeta = attachedFiles.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }))
+
       addMessage({
         role: 'user',
-        content: formData.get('message') as string,
+        content:
+          (formData.get('message') as string) ||
+          (fileMeta.length > 0 ? `Sent ${fileMeta.length} file(s)` : ''),
+        files: fileMeta.length > 0 ? fileMeta : undefined,
         created_at: Math.floor(Date.now() / 1000)
       })
 
