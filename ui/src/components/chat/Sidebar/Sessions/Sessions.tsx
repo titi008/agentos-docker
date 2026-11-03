@@ -48,7 +48,8 @@ const Sessions = () => {
     hydrated,
     sessionsData,
     setSessionsData,
-    isSessionsLoading
+    isSessionsLoading,
+    isStreaming
   } = useStore()
 
   const [isScrolling, setIsScrolling] = useState(false)
@@ -81,6 +82,9 @@ const Sessions = () => {
   }, [])
 
   useEffect(() => {
+    // Avoid querying past session history from the database while a run is actively streaming
+    if (isStreaming) return
+
     if (hydrated && sessionId && selectedEndpoint && (agentId || teamId)) {
       const entityType = agentId ? 'agent' : 'team'
       getSession({ entityType, agentId, teamId, dbId }, sessionId)
