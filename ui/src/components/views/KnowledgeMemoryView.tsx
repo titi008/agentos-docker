@@ -45,7 +45,7 @@ dayjs.extend(relativeTime)
 type KnowledgeMemoryTab = 'memories' | 'learnings' | 'knowledge'
 
 export const KnowledgeMemoryView = () => {
-  const { selectedEndpoint, authToken } = useStore()
+  const { selectedEndpoint, authToken, userId } = useStore()
   const [activeTab, setActiveTab] =
     useState<KnowledgeMemoryTab>('memories')
 
@@ -85,24 +85,25 @@ export const KnowledgeMemoryView = () => {
       const res = await getMemoriesAPI(
         selectedEndpoint,
         authToken,
-        memorySearch || undefined
+        memorySearch || undefined,
+        userId
       )
       setMemories(res)
     } finally {
       setIsMemoriesLoading(false)
     }
-  }, [selectedEndpoint, authToken, memorySearch])
+  }, [selectedEndpoint, authToken, memorySearch, userId])
 
   const fetchLearnings = useCallback(async () => {
     if (!selectedEndpoint) return
     setIsLearningsLoading(true)
     try {
-      const res = await getLearningsAPI(selectedEndpoint, authToken)
+      const res = await getLearningsAPI(selectedEndpoint, authToken, userId)
       setLearnings(res)
     } finally {
       setIsLearningsLoading(false)
     }
-  }, [selectedEndpoint, authToken])
+  }, [selectedEndpoint, authToken, userId])
 
   const fetchKnowledge = useCallback(async () => {
     if (!selectedEndpoint) return
@@ -136,7 +137,8 @@ export const KnowledgeMemoryView = () => {
         editingMemory.memory_id,
         newMemoryText.trim(),
         topics,
-        authToken
+        authToken,
+        userId
       )
       if (ok) {
         setEditingMemory(null)
@@ -150,7 +152,8 @@ export const KnowledgeMemoryView = () => {
         selectedEndpoint,
         newMemoryText.trim(),
         topics,
-        authToken
+        authToken,
+        userId
       )
       if (ok) {
         setNewMemoryText('')
@@ -163,7 +166,7 @@ export const KnowledgeMemoryView = () => {
 
   const handleDeleteMemory = async (memoryId: string) => {
     if (!confirm('Are you sure you want to delete this memory?')) return
-    const ok = await deleteMemoryAPI(selectedEndpoint, memoryId, authToken)
+    const ok = await deleteMemoryAPI(selectedEndpoint, memoryId, authToken, userId)
     if (ok) fetchMemories()
   }
 

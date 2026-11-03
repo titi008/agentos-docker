@@ -10,6 +10,7 @@ import Icon from '@/components/ui/icon'
 import { getProviderIcon } from '@/lib/modelProvider'
 import Sessions from './Sessions'
 import AuthToken from './AuthToken'
+import OperatorIdentity from './OperatorIdentity'
 import { isValidUrl } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useQueryState } from 'nuqs'
@@ -352,6 +353,7 @@ const Sidebar = ({
         )}
         {isMounted && (
           <>
+            <OperatorIdentity />
             <Endpoint />
             <AuthToken hasEnvToken={hasEnvToken} envToken={envToken} />
             {isEndpointActive && activeView === 'chat' && (

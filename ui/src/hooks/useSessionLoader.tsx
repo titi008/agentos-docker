@@ -28,6 +28,7 @@ const useSessionLoader = () => {
   const setMessages = useStore((state) => state.setMessages)
   const selectedEndpoint = useStore((state) => state.selectedEndpoint)
   const authToken = useStore((state) => state.authToken)
+  const userId = useStore((state) => state.userId)
   const setIsSessionsLoading = useStore((state) => state.setIsSessionsLoading)
   const setSessionsData = useStore((state) => state.setSessionsData)
 
@@ -44,7 +45,8 @@ const useSessionLoader = () => {
           entityType,
           selectedId,
           dbId,
-          authToken
+          authToken,
+          userId
         )
         setSessionsData(sessions.data ?? [])
       } catch {
@@ -54,7 +56,7 @@ const useSessionLoader = () => {
         setIsSessionsLoading(false)
       }
     },
-    [selectedEndpoint, authToken, setSessionsData, setIsSessionsLoading]
+    [selectedEndpoint, authToken, userId, setSessionsData, setIsSessionsLoading]
   )
 
   const getSession = useCallback(
@@ -78,7 +80,8 @@ const useSessionLoader = () => {
           entityType,
           sessionId,
           dbId,
-          authToken
+          authToken,
+          userId
         )
         if (response) {
           if (Array.isArray(response)) {
@@ -163,7 +166,7 @@ const useSessionLoader = () => {
         return null
       }
     },
-    [selectedEndpoint, authToken, setMessages]
+    [selectedEndpoint, authToken, userId, setMessages]
   )
 
   return { getSession, getSessions }

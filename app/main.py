@@ -3,12 +3,14 @@ AgentOS Entrypoint
 ==================
 """
 
+from collections.abc import Awaitable, Callable
 from os import getenv
 from pathlib import Path
 
 from agno.job_queue import QueueConfig
 from agno.os import AgentOS, CompanyConfig, OSManager
 from agno.os.config import CORSConfig
+from fastapi import Request, Response
 
 from agents.copywriter import content_strategist
 from agents.researcher import market_researcher
@@ -69,6 +71,16 @@ agent_os = AgentOS(
 )
 attach_interfaces(agent_os)
 app = agent_os.get_app()
+
+
+@app.middleware("http")
+async def user_identity_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Propagate verified user identity from Cloudflare Zero Trust or forwarded client headers."""
+    user_header = request.headers.get("cf-access-authenticated-user-email") or request.headers.get("x-user-id")
+    if user_header and not getattr(request.state, "user_id", None):
+        request.state.user_id = user_header.strip()
+    return await call_next(request)
+
 
 if __name__ == "__main__":
     agent_os.serve(app="app.main:app", host="127.0.0.1", port=8000, reload=False)

@@ -23,14 +23,18 @@ import {
   CompanyTask
 } from '@/types/os'
 
-// Helper function to create headers with optional auth token
-const createHeaders = (authToken?: string): HeadersInit => {
+// Helper function to create headers with optional auth token and deterministic user ID
+const createHeaders = (authToken?: string, userId?: string): HeadersInit => {
   const headers: HeadersInit = {
     'Content-Type': 'application/json'
   }
 
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`
+  }
+
+  if (userId) {
+    headers['X-User-Id'] = userId
   }
 
   return headers
@@ -74,17 +78,21 @@ export const getAllSessionsAPI = async (
   type: 'agent' | 'team',
   componentId: string,
   dbId: string,
-  authToken?: string
+  authToken?: string,
+  userId?: string
 ): Promise<Sessions | { data: [] }> => {
   try {
     const url = new URL(APIRoutes.GetSessions(base))
     url.searchParams.set('type', type)
     url.searchParams.set('component_id', componentId)
     url.searchParams.set('db_id', dbId)
+    if (userId) {
+      url.searchParams.set('user_id', userId)
+    }
 
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: createHeaders(authToken)
+      headers: createHeaders(authToken, userId)
     })
 
     if (!response.ok) {
@@ -104,17 +112,19 @@ export const getSessionAPI = async (
   type: 'agent' | 'team',
   sessionId: string,
   dbId?: string,
-  authToken?: string
+  authToken?: string,
+  userId?: string
 ) => {
   // build query string
   const queryParams = new URLSearchParams({ type })
   if (dbId) queryParams.append('db_id', dbId)
+  if (userId) queryParams.append('user_id', userId)
 
   const response = await fetch(
     `${APIRoutes.GetSession(base, sessionId)}?${queryParams.toString()}`,
     {
       method: 'GET',
-      headers: createHeaders(authToken)
+      headers: createHeaders(authToken, userId)
     }
   )
 
@@ -297,14 +307,16 @@ export const getEvalRunsAPI = async (
 export const getMemoriesAPI = async (
   endpoint: string,
   authToken?: string,
-  search?: string
+  search?: string,
+  userId?: string
 ): Promise<UserMemorySchema[]> => {
   try {
     const url = new URL(APIRoutes.GetMemories(endpoint))
     if (search) url.searchParams.set('search_content', search)
+    if (userId) url.searchParams.set('user_id', userId)
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: createHeaders(authToken)
+      headers: createHeaders(authToken, userId)
     })
     if (!response.ok) {
       return []
@@ -320,13 +332,14 @@ export const createMemoryAPI = async (
   endpoint: string,
   memory: string,
   topics?: string[],
-  authToken?: string
+  authToken?: string,
+  userId?: string
 ): Promise<boolean> => {
   try {
     const response = await fetch(APIRoutes.CreateMemory(endpoint), {
       method: 'POST',
-      headers: createHeaders(authToken),
-      body: JSON.stringify({ memory, topics: topics || [] })
+      headers: createHeaders(authToken, userId),
+      body: JSON.stringify({ memory, topics: topics || [], user_id: userId })
     })
     if (!response.ok) {
       toast.error('Failed to create memory')
@@ -345,13 +358,14 @@ export const updateMemoryAPI = async (
   memoryId: string,
   memory: string,
   topics?: string[],
-  authToken?: string
+  authToken?: string,
+  userId?: string
 ): Promise<boolean> => {
   try {
     const response = await fetch(APIRoutes.UpdateMemory(endpoint, memoryId), {
       method: 'PATCH',
-      headers: createHeaders(authToken),
-      body: JSON.stringify({ memory, topics: topics || [] })
+      headers: createHeaders(authToken, userId),
+      body: JSON.stringify({ memory, topics: topics || [], user_id: userId })
     })
     if (!response.ok) {
       toast.error('Failed to update memory')
@@ -368,12 +382,17 @@ export const updateMemoryAPI = async (
 export const deleteMemoryAPI = async (
   endpoint: string,
   memoryId: string,
-  authToken?: string
+  authToken?: string,
+  userId?: string
 ): Promise<boolean> => {
   try {
-    const response = await fetch(APIRoutes.DeleteMemory(endpoint, memoryId), {
+    const url = new URL(APIRoutes.DeleteMemory(endpoint, memoryId))
+    if (userId) {
+      url.searchParams.set('user_id', userId)
+    }
+    const response = await fetch(url.toString(), {
       method: 'DELETE',
-      headers: createHeaders(authToken)
+      headers: createHeaders(authToken, userId)
     })
     if (!response.ok) {
       toast.error('Failed to delete memory')
@@ -389,12 +408,17 @@ export const deleteMemoryAPI = async (
 
 export const getLearningsAPI = async (
   endpoint: string,
-  authToken?: string
+  authToken?: string,
+  userId?: string
 ): Promise<LearningResponse[]> => {
   try {
-    const response = await fetch(APIRoutes.GetLearnings(endpoint), {
+    const url = new URL(APIRoutes.GetLearnings(endpoint))
+    if (userId) {
+      url.searchParams.set('user_id', userId)
+    }
+    const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: createHeaders(authToken)
+      headers: createHeaders(authToken, userId)
     })
     if (!response.ok) {
       return []

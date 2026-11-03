@@ -60,6 +60,8 @@ interface Store {
   ) => void
   pendingApprovalsCount: number
   setPendingApprovalsCount: (count: number) => void
+  userId: string
+  setUserId: (userId: string) => void
 }
 
 export const useStore = create<Store>()(
@@ -115,13 +117,16 @@ export const useStore = create<Store>()(
       setActiveView: (activeView) => set(() => ({ activeView })),
       pendingApprovalsCount: 0,
       setPendingApprovalsCount: (pendingApprovalsCount) =>
-        set(() => ({ pendingApprovalsCount }))
+        set(() => ({ pendingApprovalsCount })),
+      userId: 'default',
+      setUserId: (userId) => set(() => ({ userId }))
     }),
     {
       name: 'endpoint-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        selectedEndpoint: state.selectedEndpoint
+        selectedEndpoint: state.selectedEndpoint,
+        userId: state.userId
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated?.()
