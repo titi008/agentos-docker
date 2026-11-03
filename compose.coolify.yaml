@@ -26,6 +26,8 @@ services:
     image: ${IMAGE_NAME:-agentos}:${IMAGE_TAG:-latest}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
+    ports:
+      - "8000"
     environment:
       RUNTIME_ENV: ${RUNTIME_ENV:-prd}
       MODEL_PROVIDER: ${MODEL_PROVIDER:-gemini}
@@ -38,6 +40,8 @@ services:
       AGNO_DEBUG: "False"
       WAIT_FOR_DB: "True"
       AGENTOS_URL: ${AGENTOS_URL}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      CORS_ORIGIN_REGEX: ${CORS_ORIGIN_REGEX:-}
       JWT_VERIFICATION_KEY: ${JWT_VERIFICATION_KEY:-}
       MCP_CONNECT_SECRET: ${MCP_CONNECT_SECRET:-}
       DB_HOST: agentos-db
@@ -59,9 +63,11 @@ services:
       dockerfile: Dockerfile
     container_name: agentos-ui
     restart: unless-stopped
+    ports:
+      - "3000"
     environment:
       PORT: 3000
-      NEXT_PUBLIC_API_URL: ${AGENTOS_URL:-https://agentos.lasttokens.dev}
+      NEXT_PUBLIC_API_URL: ${AGENTOS_URL:-}
     depends_on:
       - agentos-api
     networks:
