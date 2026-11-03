@@ -70,11 +70,11 @@ const AgentMessage = ({ message }: MessageProps) => {
   }
 
   return (
-    <div className="flex flex-row items-start gap-4 font-geist">
+    <div className="flex flex-row items-start gap-3 md:gap-4 font-geist min-w-0 w-full">
       <div className="flex-shrink-0">
         <Icon type="agent" size="sm" />
       </div>
-      {messageContent}
+      <div className="min-w-0 flex-1">{messageContent}</div>
     </div>
   )
 }
@@ -89,12 +89,12 @@ const formatBytes = (bytes: number): string => {
 
 const UserMessage = memo(({ message }: MessageProps) => {
   return (
-    <div className="flex items-start gap-4 pt-4 text-start max-md:break-words">
+    <div className="flex items-start gap-3 md:gap-4 pt-4 text-start max-md:break-words min-w-0 w-full">
       <div className="flex-shrink-0">
         <Icon type="user" size="sm" />
       </div>
-      <div className="flex flex-col gap-2">
-        <div className="text-md rounded-lg font-geist text-secondary">
+      <div className="flex flex-col gap-2 min-w-0 flex-1">
+        <div className="text-md rounded-lg font-geist text-secondary break-words">
           {message.content}
         </div>
         {message.files && message.files.length > 0 && (

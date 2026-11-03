@@ -47,11 +47,15 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 
 dayjs.extend(relativeTime)
 
-type StudioTab = 'agents' | 'teams' | 'workflows' | 'registry'
-
 export const StudioView = () => {
-  const { selectedEndpoint, authToken, setActiveView, setMode } = useStore()
-  const [activeTab, setActiveTab] = useState<StudioTab>('agents')
+  const {
+    selectedEndpoint,
+    authToken,
+    setActiveView,
+    setMode,
+    studioTab: activeTab,
+    setStudioTab: setActiveTab
+  } = useStore()
   const [isLoading, setIsLoading] = useState(false)
 
   // Query state hooks for 1-click Chat launch
@@ -404,9 +408,9 @@ export const StudioView = () => {
   const availableFunctions = registryItems.filter((i) => i.type === 'function')
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
+    <div className="flex h-full flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between border-b border-primary/10 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 px-3 md:px-6 py-3 md:py-4">
         <div>
           <h1 className="flex items-center gap-2 text-base font-semibold text-primary">
             <LayoutGrid className="size-5" /> Studio & Component Manager
@@ -417,10 +421,10 @@ export const StudioView = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-full rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
           <button
             onClick={() => setActiveTab('agents')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'agents'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -430,7 +434,7 @@ export const StudioView = () => {
           </button>
           <button
             onClick={() => setActiveTab('teams')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'teams'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -440,7 +444,7 @@ export const StudioView = () => {
           </button>
           <button
             onClick={() => setActiveTab('workflows')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'workflows'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -450,7 +454,7 @@ export const StudioView = () => {
           </button>
           <button
             onClick={() => setActiveTab('registry')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'registry'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -462,15 +466,15 @@ export const StudioView = () => {
       </div>
 
       {/* Action Bar (Search + Refresh + New Buttons) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary/5 px-6 py-3 bg-accent/10">
-        <div className="relative">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/5 px-3 md:px-6 py-2.5 md:py-3 bg-accent/10">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-2.5 size-3.5 text-muted" />
           <input
             type="text"
             placeholder={`Search ${activeTab}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-64 rounded-xl border border-primary/15 bg-accent/40 pl-9 pr-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+            className="h-9 w-full sm:w-64 rounded-xl border border-primary/15 bg-accent/40 pl-9 pr-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-hidden"
           />
         </div>
 

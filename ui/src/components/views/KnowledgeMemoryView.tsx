@@ -49,12 +49,14 @@ import { toast } from 'sonner'
 
 dayjs.extend(relativeTime)
 
-type KnowledgeMemoryTab = 'memories' | 'learnings' | 'knowledge' | 'filesystem'
-
 export const KnowledgeMemoryView = () => {
-  const { selectedEndpoint, authToken, userId } = useStore()
-  const [activeTab, setActiveTab] =
-    useState<KnowledgeMemoryTab>('memories')
+  const {
+    selectedEndpoint,
+    authToken,
+    userId,
+    knowledgeTab: activeTab,
+    setKnowledgeTab: setActiveTab
+  } = useStore()
 
   // Memories state
   const [memories, setMemories] = useState<UserMemorySchema[]>([])
@@ -283,9 +285,9 @@ export const KnowledgeMemoryView = () => {
   }
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
+    <div className="flex h-full flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between border-b border-primary/10 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 px-3 md:px-6 py-3 md:py-4">
         <div>
           <h1 className="flex items-center gap-2 text-base font-semibold text-primary">
             <Brain className="size-5" /> Memory & Knowledge Base
@@ -296,10 +298,10 @@ export const KnowledgeMemoryView = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-full rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
           <button
             onClick={() => setActiveTab('memories')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'memories'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -309,7 +311,7 @@ export const KnowledgeMemoryView = () => {
           </button>
           <button
             onClick={() => setActiveTab('learnings')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'learnings'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -319,7 +321,7 @@ export const KnowledgeMemoryView = () => {
           </button>
           <button
             onClick={() => setActiveTab('knowledge')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'knowledge'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -329,7 +331,7 @@ export const KnowledgeMemoryView = () => {
           </button>
           <button
             onClick={() => setActiveTab('filesystem')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'filesystem'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'

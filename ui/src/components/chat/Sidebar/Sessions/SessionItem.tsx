@@ -30,7 +30,13 @@ const SessionItem = ({
   const [, setSessionId] = useQueryState('session')
   const authToken = useStore((state) => state.authToken)
   const { getSession } = useSessionLoader()
-  const { selectedEndpoint, sessionsData, setSessionsData, mode } = useStore()
+  const {
+    selectedEndpoint,
+    sessionsData,
+    setSessionsData,
+    mode,
+    setIsMobileSidebarOpen
+  } = useStore()
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { clearChat } = useChatActions()
@@ -38,6 +44,7 @@ const SessionItem = ({
   const handleGetSession = async () => {
     if (!(agentId || teamId || workflowId || dbId)) return
 
+    setIsMobileSidebarOpen(false)
     onSessionClick()
     await getSession(
       {

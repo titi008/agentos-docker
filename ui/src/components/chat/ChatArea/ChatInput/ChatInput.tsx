@@ -25,9 +25,11 @@ const ChatInput = () => {
   const { handleStreamResponse } = useAIChatStreamHandler()
   const [selectedAgent] = useQueryState('agent')
   const [teamId] = useQueryState('team')
+  const [workflowId] = useQueryState('workflow')
   const [inputMessage, setInputMessage] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const isStreaming = useStore((state) => state.isStreaming)
+  const hasTarget = !!(selectedAgent || teamId || workflowId)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
@@ -115,10 +117,10 @@ const ChatInput = () => {
         <Button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={!(selectedAgent || teamId) || isStreaming}
+          disabled={!hasTarget || isStreaming}
           size="icon"
           title="Attach files (PDF, images, CSV, docs)"
-          className="rounded-xl border border-accent bg-primaryAccent p-5 text-muted hover:text-primary hover:border-primary/40 transition shrink-0"
+          className="flex size-11 items-center justify-center rounded-xl border border-accent bg-primaryAccent text-muted hover:text-primary hover:border-primary/40 transition shrink-0"
         >
           <Paperclip className="size-4" />
         </Button>
@@ -137,19 +139,19 @@ const ChatInput = () => {
               handleSubmit()
             }
           }}
-          className="w-full border border-accent bg-primaryAccent px-4 text-sm text-primary focus:border-accent"
-          disabled={!(selectedAgent || teamId)}
+          className="w-full border border-accent bg-primaryAccent px-4 py-2.5 text-base md:text-sm text-primary focus:border-accent min-h-[44px]"
+          disabled={!hasTarget}
           ref={chatInputRef}
         />
         <Button
           onClick={handleSubmit}
           disabled={
-            !(selectedAgent || teamId) ||
+            !hasTarget ||
             (!inputMessage.trim() && selectedFiles.length === 0) ||
             isStreaming
           }
           size="icon"
-          className="rounded-xl bg-primary p-5 text-primaryAccent shrink-0"
+          className="flex size-11 items-center justify-center rounded-xl bg-primary text-primaryAccent shrink-0"
         >
           <Icon type="send" color="primaryAccent" />
         </Button>

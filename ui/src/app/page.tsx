@@ -1,5 +1,7 @@
 'use client'
+
 import Sidebar from '@/components/chat/Sidebar/Sidebar'
+import { MobileHeader } from '@/components/chat/MobileHeader'
 import { ChatArea } from '@/components/chat/ChatArea'
 import { StudioView } from '@/components/views/StudioView'
 import { ObservabilityView } from '@/components/views/ObservabilityView'
@@ -14,14 +16,23 @@ export default function Home() {
   const { activeView } = useStore()
 
   return (
-    <Suspense fallback={<div className="p-4 text-xs font-dmmono text-muted">Loading workspace...</div>}>
-      <div className="flex h-screen bg-background/80 overflow-hidden">
+    <Suspense
+      fallback={
+        <div className="p-4 text-xs font-dmmono text-muted">
+          Loading workspace...
+        </div>
+      }
+    >
+      <div className="flex h-screen h-dvh min-h-dvh w-full flex-col md:flex-row bg-background/80 overflow-hidden">
+        <MobileHeader />
         <Sidebar hasEnvToken={hasEnvToken} envToken={envToken} />
-        {activeView === 'chat' && <ChatArea />}
-        {activeView === 'studio' && <StudioView />}
-        {activeView === 'observability' && <ObservabilityView />}
-        {activeView === 'knowledge' && <KnowledgeMemoryView />}
-        {activeView === 'operations' && <OperationsView />}
+        <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {activeView === 'chat' && <ChatArea />}
+          {activeView === 'studio' && <StudioView />}
+          {activeView === 'observability' && <ObservabilityView />}
+          {activeView === 'knowledge' && <KnowledgeMemoryView />}
+          {activeView === 'operations' && <OperationsView />}
+        </main>
       </div>
     </Suspense>
   )

@@ -65,6 +65,16 @@ interface Store {
   setPendingApprovalsCount: (count: number) => void
   userId: string
   setUserId: (userId: string) => void
+  isMobileSidebarOpen: boolean
+  setIsMobileSidebarOpen: (isOpen: boolean) => void
+  studioTab: 'agents' | 'teams' | 'workflows' | 'registry'
+  setStudioTab: (tab: 'agents' | 'teams' | 'workflows' | 'registry') => void
+  observabilityTab: 'traces' | 'metrics' | 'evals'
+  setObservabilityTab: (tab: 'traces' | 'metrics' | 'evals') => void
+  knowledgeTab: 'memories' | 'learnings' | 'knowledge' | 'filesystem'
+  setKnowledgeTab: (tab: 'memories' | 'learnings' | 'knowledge' | 'filesystem') => void
+  operationsTab: 'approvals' | 'schedules' | 'queue' | 'tasks'
+  setOperationsTab: (tab: 'approvals' | 'schedules' | 'queue' | 'tasks') => void
 }
 
 export const useStore = create<Store>()(
@@ -124,7 +134,19 @@ export const useStore = create<Store>()(
       setPendingApprovalsCount: (pendingApprovalsCount) =>
         set(() => ({ pendingApprovalsCount })),
       userId: 'default',
-      setUserId: (userId) => set(() => ({ userId }))
+      setUserId: (userId) => set(() => ({ userId })),
+      isMobileSidebarOpen: false,
+      setIsMobileSidebarOpen: (isMobileSidebarOpen) =>
+        set(() => ({ isMobileSidebarOpen })),
+      studioTab: 'agents',
+      setStudioTab: (studioTab) => set(() => ({ studioTab })),
+      observabilityTab: 'traces',
+      setObservabilityTab: (observabilityTab) =>
+        set(() => ({ observabilityTab })),
+      knowledgeTab: 'memories',
+      setKnowledgeTab: (knowledgeTab) => set(() => ({ knowledgeTab })),
+      operationsTab: 'approvals',
+      setOperationsTab: (operationsTab) => set(() => ({ operationsTab }))
     }),
     {
       name: 'endpoint-storage',

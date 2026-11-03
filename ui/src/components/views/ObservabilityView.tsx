@@ -38,8 +38,6 @@ import { toast } from 'sonner'
 
 dayjs.extend(relativeTime)
 
-type ObservabilityTab = 'traces' | 'metrics' | 'evals'
-
 const SpanNodeView = ({
   node,
   depth = 0
@@ -181,8 +179,12 @@ const SpanNodeView = ({
 }
 
 export const ObservabilityView = () => {
-  const { selectedEndpoint, authToken } = useStore()
-  const [activeTab, setActiveTab] = useState<ObservabilityTab>('traces')
+  const {
+    selectedEndpoint,
+    authToken,
+    observabilityTab: activeTab,
+    setObservabilityTab: setActiveTab
+  } = useStore()
 
   // Traces state
   const [traces, setTraces] = useState<TraceSummary[]>([])
@@ -305,9 +307,9 @@ export const ObservabilityView = () => {
   ) || 0
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
+    <div className="flex h-full flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between border-b border-primary/10 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 px-3 md:px-6 py-3 md:py-4">
         <div>
           <h1 className="flex items-center gap-2 text-base font-semibold text-primary">
             <Activity className="size-5" /> Observability & Traces
@@ -318,10 +320,10 @@ export const ObservabilityView = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-full rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
           <button
             onClick={() => setActiveTab('traces')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'traces'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -331,7 +333,7 @@ export const ObservabilityView = () => {
           </button>
           <button
             onClick={() => setActiveTab('metrics')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'metrics'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -341,7 +343,7 @@ export const ObservabilityView = () => {
           </button>
           <button
             onClick={() => setActiveTab('evals')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'evals'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -358,16 +360,16 @@ export const ObservabilityView = () => {
         {activeTab === 'traces' && (
           <div className="space-y-4">
             {/* Filter Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="relative">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-2.5 size-3.5 text-muted" />
                   <input
                     type="text"
                     placeholder="Search traces..."
                     value={traceSearch}
                     onChange={(e) => setTraceSearch(e.target.value)}
-                    className="h-9 w-64 rounded-xl border border-primary/15 bg-accent/40 pl-8 pr-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                    className="h-9 w-full sm:w-64 rounded-xl border border-primary/15 bg-accent/40 pl-8 pr-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-hidden"
                   />
                 </div>
 

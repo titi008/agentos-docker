@@ -50,11 +50,15 @@ import { toast } from 'sonner'
 
 dayjs.extend(relativeTime)
 
-type OperationsTab = 'approvals' | 'schedules' | 'queue' | 'tasks'
-
 export const OperationsView = () => {
-  const { selectedEndpoint, authToken, pendingApprovalsCount, setPendingApprovalsCount } = useStore()
-  const [activeTab, setActiveTab] = useState<OperationsTab>('approvals')
+  const {
+    selectedEndpoint,
+    authToken,
+    pendingApprovalsCount,
+    setPendingApprovalsCount,
+    operationsTab: activeTab,
+    setOperationsTab: setActiveTab
+  } = useStore()
 
   // Approvals state
   const [approvals, setApprovals] = useState<ApprovalResponse[]>([])
@@ -227,9 +231,9 @@ export const OperationsView = () => {
   })
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
+    <div className="flex h-full flex-1 flex-col overflow-hidden bg-background text-foreground font-dmmono">
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between border-b border-primary/10 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 px-3 md:px-6 py-3 md:py-4">
         <div>
           <h1 className="flex items-center gap-2 text-base font-semibold text-primary">
             <Briefcase className="size-5" /> Operations & Command Center
@@ -240,10 +244,10 @@ export const OperationsView = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-full rounded-xl border border-primary/15 bg-accent/40 p-1 text-xs font-medium">
           <button
             onClick={() => setActiveTab('approvals')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'approvals'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -258,7 +262,7 @@ export const OperationsView = () => {
           </button>
           <button
             onClick={() => setActiveTab('schedules')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'schedules'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -268,7 +272,7 @@ export const OperationsView = () => {
           </button>
           <button
             onClick={() => setActiveTab('queue')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'queue'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
@@ -278,7 +282,7 @@ export const OperationsView = () => {
           </button>
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
               activeTab === 'tasks'
                 ? 'bg-primary text-background font-semibold shadow-sm'
                 : 'text-muted hover:text-foreground'
