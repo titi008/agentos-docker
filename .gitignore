@@ -79,8 +79,9 @@ tmp
 
 # Node (local tooling installs for deploy scripts)
 node_modules/
-package.json
-package-lock.json
+/package.json
+/package-lock.json
+!ui/package.json
 
 # Optional: local PyPI creds (uncomment if you ever create it)
 # .pypirc
