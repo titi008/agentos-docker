@@ -11,7 +11,7 @@ from agno.agent import Agent
 from agno.job_queue import QueueConfig
 from agno.os import AgentOS, CompanyConfig, OSManager
 from agno.os.config import CORSConfig
-from fastapi import Request, Response
+from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
 
 from agents.copywriter import content_strategist
@@ -47,7 +47,97 @@ cors_config = (
     else None
 )
 
+base_app = FastAPI()
+
+
+@base_app.middleware("http")
+async def user_identity_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Propagate verified user identity from Cloudflare Zero Trust or forwarded client headers."""
+    user_header = request.headers.get("cf-access-authenticated-user-email") or request.headers.get("x-user-id")
+    if user_header and not getattr(request.state, "user_id", None):
+        request.state.user_id = user_header.strip()
+
+    model_override = request.headers.get("x-model-override")
+    if model_override:
+        request.state.session_state = {"model_override": model_override.strip()}
+
+    return await call_next(request)
+
+
+class UpdateAgentModelPayload(BaseModel):
+    model_id: str
+
+
+@base_app.get("/api/models")
+async def get_available_models_endpoint() -> list[dict]:
+    """Return palette of supported models for the UI."""
+    models = get_available_models()
+    return [{"id": m.id, "provider": getattr(m, "provider", "Unknown")} for m in models]
+
+
+@base_app.api_route("/agents/{agent_id}/model", methods=["POST", "PATCH", "PUT"])
+@base_app.api_route("/api/agents/{agent_id}/model", methods=["POST", "PATCH", "PUT"])
+async def update_agent_model_endpoint(agent_id: str, payload: UpdateAgentModelPayload) -> dict:
+    """Update and persist the model for an application agent."""
+    new_model = model_from_id(payload.model_id)
+    save_agent_model_override(agent_id, payload.model_id)
+
+    found = False
+    if agent_os.agents:
+        for a in agent_os.agents:
+            if isinstance(a, Agent) and a.id == agent_id:
+                a.model = new_model
+                found = True
+                break
+
+    return {
+        "status": "success",
+        "agent_id": agent_id,
+        "model_id": payload.model_id,
+        "provider": getattr(new_model, "provider", "Unknown"),
+        "updated_in_memory": found,
+    }
+
+
+class UpdatePriceRequest(BaseModel):
+    model_id: str
+    input_cost_per_m: float
+    output_cost_per_m: float
+    provider: str | None = None
+
+
+@base_app.get("/pricing")
+@base_app.get("/api/pricing")
+async def get_pricing() -> dict:
+    """Return active model rates and rate change history."""
+    return {
+        "current_rates": [r.to_dict() for r in pricing_manager.get_current_rates()],
+        "history": [r.to_dict() for r in pricing_manager.get_rates()],
+    }
+
+
+@base_app.post("/pricing")
+@base_app.post("/api/pricing")
+async def update_pricing(payload: UpdatePriceRequest) -> dict:
+    """Update pricing for a model effective immediately, leaving past runs unchanged."""
+    rate = pricing_manager.update_rate(
+        model_id=payload.model_id,
+        input_cost_per_m=payload.input_cost_per_m,
+        output_cost_per_m=payload.output_cost_per_m,
+        provider=payload.provider,
+    )
+    return {"status": "success", "rate": rate.to_dict()}
+
+
+@base_app.get("/costs")
+@base_app.get("/api/costs")
+async def get_costs() -> dict:
+    """Return aggregated token and cost breakdown per model, provider, and day."""
+    return compute_cost_breakdown()
+
+
 agent_os = AgentOS(
+    base_app=base_app,
     db=db,
     mcp=True,
     tracing=True,
@@ -79,92 +169,6 @@ agent_os = AgentOS(
 )
 attach_interfaces(agent_os)
 app = agent_os.get_app()
-
-
-@app.middleware("http")
-async def user_identity_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-    """Propagate verified user identity from Cloudflare Zero Trust or forwarded client headers."""
-    user_header = request.headers.get("cf-access-authenticated-user-email") or request.headers.get("x-user-id")
-    if user_header and not getattr(request.state, "user_id", None):
-        request.state.user_id = user_header.strip()
-
-    model_override = request.headers.get("x-model-override")
-    if model_override:
-        request.state.session_state = {"model_override": model_override.strip()}
-
-    return await call_next(request)
-
-
-class UpdateAgentModelPayload(BaseModel):
-    model_id: str
-
-
-@app.get("/api/models")
-async def get_available_models_endpoint() -> list[dict]:
-    """Return palette of supported models for the UI."""
-    models = get_available_models()
-    return [{"id": m.id, "provider": getattr(m, "provider", "Unknown")} for m in models]
-
-
-@app.post("/agents/{agent_id}/model")
-@app.post("/api/agents/{agent_id}/model")
-async def update_agent_model_endpoint(agent_id: str, payload: UpdateAgentModelPayload) -> dict:
-    """Update and persist the model for an application agent."""
-    new_model = model_from_id(payload.model_id)
-    save_agent_model_override(agent_id, payload.model_id)
-
-    found = False
-    if agent_os.agents:
-        for a in agent_os.agents:
-            if isinstance(a, Agent) and a.id == agent_id:
-                a.model = new_model
-                found = True
-                break
-
-    return {
-        "status": "success",
-        "agent_id": agent_id,
-        "model_id": payload.model_id,
-        "provider": getattr(new_model, "provider", "Unknown"),
-        "updated_in_memory": found,
-    }
-
-
-class UpdatePriceRequest(BaseModel):
-    model_id: str
-    input_cost_per_m: float
-    output_cost_per_m: float
-    provider: str | None = None
-
-
-@app.get("/pricing")
-@app.get("/api/pricing")
-async def get_pricing() -> dict:
-    """Return active model rates and rate change history."""
-    return {
-        "current_rates": [r.to_dict() for r in pricing_manager.get_current_rates()],
-        "history": [r.to_dict() for r in pricing_manager.get_rates()],
-    }
-
-
-@app.post("/pricing")
-@app.post("/api/pricing")
-async def update_pricing(payload: UpdatePriceRequest) -> dict:
-    """Update pricing for a model effective immediately, leaving past runs unchanged."""
-    rate = pricing_manager.update_rate(
-        model_id=payload.model_id,
-        input_cost_per_m=payload.input_cost_per_m,
-        output_cost_per_m=payload.output_cost_per_m,
-        provider=payload.provider,
-    )
-    return {"status": "success", "rate": rate.to_dict()}
-
-
-@app.get("/costs")
-@app.get("/api/costs")
-async def get_costs() -> dict:
-    """Return aggregated token and cost breakdown per model, provider, and day."""
-    return compute_cost_breakdown()
 
 
 if __name__ == "__main__":

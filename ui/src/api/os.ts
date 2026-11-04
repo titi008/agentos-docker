@@ -353,13 +353,15 @@ export const updatePricingAPI = async (
       })
     }
     if (!response.ok) {
-      toast.error('Failed to update pricing')
+      const errText = await response.text().catch(() => '')
+      toast.error(`Failed to update pricing (${response.status}): ${errText || response.statusText}`)
       return false
     }
     toast.success(`Updated pricing for ${payload.model_id}`)
     return true
-  } catch {
-    toast.error('Network error updating pricing')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error'
+    toast.error(`Network error updating pricing: ${msg}`)
     return false
   }
 }
@@ -428,13 +430,15 @@ export const updateAgentModelAPI = async (
       })
     }
     if (!response.ok) {
-      toast.error('Failed to update agent model')
+      const errText = await response.text().catch(() => '')
+      toast.error(`Failed to update agent model (${response.status}): ${errText || response.statusText}`)
       return false
     }
     toast.success(`Agent model updated to ${modelId}`)
     return true
-  } catch {
-    toast.error('Error updating agent model')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error'
+    toast.error(`Error updating agent model: ${msg}`)
     return false
   }
 }
