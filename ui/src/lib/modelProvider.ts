@@ -3,9 +3,12 @@ import { IconType } from '@/components/ui/icon'
 const PROVIDER_ICON_MAP: Record<string, IconType> = {
   aws: 'aws',
   openai: 'open-ai',
+  gpt: 'open-ai',
   anthropic: 'anthropic',
+  claude: 'anthropic',
   mistral: 'mistral',
   gemini: 'gemini',
+  google: 'gemini',
   azure: 'azure',
   groq: 'groq',
   fireworks: 'fireworks',

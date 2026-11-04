@@ -110,7 +110,7 @@ const useChatActions = () => {
           } else if (currentMode === 'team' && teams.length > 0) {
             const firstTeam = teams[0]
             setTeamId(firstTeam.id)
-            setSelectedModel(firstTeam.model?.provider || '')
+            setSelectedModel(firstTeam.model?.model || firstTeam.model?.provider || '')
             setDbId(firstTeam.db_id || '')
             setAgentId(null)
             setWorkflowId(null)
@@ -155,7 +155,7 @@ const useChatActions = () => {
             const team = teams.find((t) => t.id === teamId)
             if (team) {
               setMode('team')
-              setSelectedModel(team.model?.provider || '')
+              setSelectedModel(team.model?.model || team.model?.provider || '')
               setDbId(team.db_id || '')
               setAgentId(null)
               setWorkflowId(null)
@@ -163,7 +163,7 @@ const useChatActions = () => {
               const firstTeam = teams[0]
               setMode('team')
               setTeamId(firstTeam.id)
-              setSelectedModel(firstTeam.model?.provider || '')
+              setSelectedModel(firstTeam.model?.model || firstTeam.model?.provider || '')
               setDbId(firstTeam.db_id || '')
               setAgentId(null)
               setWorkflowId(null)

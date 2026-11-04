@@ -38,7 +38,14 @@ import {
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react'
-import { getApprovalsCountAPI } from '@/api/os'
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select'
+import { getApprovalsCountAPI, getAvailableModelsAPI } from '@/api/os'
+import { AvailableModel } from '@/types/os'
 
 const ENDPOINT_PLACEHOLDER = 'NO ENDPOINT ADDED'
 
@@ -60,15 +67,96 @@ const NewChatButton = ({
   </Button>
 )
 
-const ModelDisplay = ({ model }: { model: string }) => (
-  <div className="flex h-9 w-full items-center gap-3 rounded-xl border border-primary/15 bg-accent p-3 text-xs font-medium uppercase text-muted">
-    {(() => {
-      const icon = getProviderIcon(model)
-      return icon ? <Icon type={icon} className="shrink-0" size="xs" /> : null
-    })()}
-    <span className="truncate">{model}</span>
-  </div>
-)
+const DEFAULT_MODELS: AvailableModel[] = [
+  { id: 'claude-sonnet-5-5', provider: 'Anthropic' },
+  { id: 'claude-opus-5-5', provider: 'Anthropic' },
+  { id: 'claude-haiku-5-5', provider: 'Anthropic' },
+  { id: 'gemini-4-argon', provider: 'Google' },
+  { id: 'gemini-3.8-flash', provider: 'Google' },
+  { id: 'gpt-6.1-sol', provider: 'OpenAI' }
+]
+
+const ModelSelector = () => {
+  const { selectedModel, setSelectedModel, selectedEndpoint, authToken, mode } =
+    useStore()
+  const [models, setModels] = useState<AvailableModel[]>(DEFAULT_MODELS)
+
+  useEffect(() => {
+    let isMounted = true
+    if (selectedEndpoint) {
+      getAvailableModelsAPI(selectedEndpoint, authToken).then((res) => {
+        if (isMounted && res && res.length > 0) {
+          setModels(res)
+        }
+      })
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [selectedEndpoint, authToken])
+
+  if (!selectedModel) return null
+
+  if (mode === 'workflow' || selectedModel === 'Workflow Pipeline') {
+    return (
+      <div className="flex h-9 w-full items-center gap-3 rounded-xl border border-primary/15 bg-accent p-3 text-xs font-medium uppercase text-muted">
+        <Icon type="agno" className="shrink-0" size="xs" />
+        <span className="truncate">{selectedModel}</span>
+      </div>
+    )
+  }
+
+  const allModels = [...models]
+  if (selectedModel && !allModels.some((m) => m.id === selectedModel)) {
+    allModels.unshift({
+      id: selectedModel,
+      provider: selectedModel.toLowerCase().includes('claude')
+        ? 'Anthropic'
+        : selectedModel.toLowerCase().includes('gemini')
+        ? 'Google'
+        : 'OpenAI'
+    })
+  }
+
+  return (
+    <Select
+      value={selectedModel}
+      onValueChange={(val) => {
+        if (val) {
+          setSelectedModel(val)
+          toast.success(`Active model switched to ${val}`)
+        }
+      }}
+    >
+      <SelectTrigger
+        title="Change chat model"
+        className="h-9 w-full rounded-xl border border-primary/15 bg-primaryAccent text-xs font-medium uppercase"
+      >
+        <div className="flex items-center gap-2.5 truncate">
+          {(() => {
+            const icon = getProviderIcon(selectedModel)
+            return icon ? <Icon type={icon} className="shrink-0" size="xs" /> : null
+          })()}
+          <span className="truncate">{selectedModel}</span>
+        </div>
+      </SelectTrigger>
+      <SelectContent className="border-none bg-primaryAccent font-dmmono shadow-lg">
+        {allModels.map((m) => {
+          const icon = getProviderIcon(m.id || m.provider)
+          return (
+            <SelectItem key={m.id} value={m.id} className="cursor-pointer">
+              <div className="flex items-center gap-2.5 text-xs font-medium">
+                {icon ? <Icon type={icon} className="shrink-0" size="xs" /> : null}
+                <span className="font-mono">{m.id}</span>
+                <span className="text-[10px] text-muted">({m.provider})</span>
+              </div>
+            </SelectItem>
+          )
+        })}
+      </SelectContent>
+    </Select>
+  )
+}
 
 const Endpoint = () => {
   const {
@@ -480,7 +568,7 @@ const SidebarContent = ({
                     <ModeSelector />
                     <EntitySelector />
                     {selectedModel && (agentId || teamId || workflowId) && (
-                      <ModelDisplay model={selectedModel} />
+                      <ModelSelector />
                     )}
                   </>
                 )}

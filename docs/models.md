@@ -193,3 +193,25 @@ def execute_subtask(task: str, cost_preference: str = "reasoning") -> str:
 | **Team Leader / Member Tiering** | Python code | Leader on Tier 1, specialist members on Tier 2 |
 | **Runtime Selection in UI** | Studio UI & Chat | Entity Selector and Model Display badge |
 | **On-the-Fly Prompt Downgrade** | Pre-hook / Team routing | `pre_hooks=[dynamic_cost_hook]` or Team Leader routing rules |
+| **Token & Cost Observability** | REST API & Dashboard | `/api/costs`, `/api/pricing`, and Observability Metrics tab |
+| **Immutable Rate Revisions** | Effective-dating engine | `app/pricing.py:PricingManager` |
+
+---
+
+## 6. Model Usage Cost Tracking & Effective-Dated Pricing
+
+AgentOS includes a built-in token cost estimation and pricing engine ([`app/pricing.py`](file:///Users/tiborszucs/My_files/Programming/Github/agno-integration/app/pricing.py)):
+
+### Effective-Dated Immutability
+When token rates change, historical cost records must remain accurate. The pricing engine enforces this through point-in-time timestamp matching:
+* Every rate version stores an `effective_from` UTC timestamp.
+* When evaluating a run, the system resolves the rate active at the moment the run executed ($T_{\text{run}}$):
+  $$\text{effective\_from} \le T_{\text{run}} < \text{next\_effective\_from}$$
+* Updating a rate in the Price Book creates a new rate version effective immediately. **Past runs are never modified or re-priced.**
+
+### Dashboard Visibility
+In the **Observability $\rightarrow$ Metrics** view:
+1. **Total Estimated Spend**: Real-time dollar totals and average cost per run.
+2. **Provider Spend Distribution**: Cards breaking down spend, percentage share, and token throughput for Anthropic, Google Gemini, and OpenAI.
+3. **Model Breakdown Table**: Per-model metrics including runs, input/output tokens, total estimated spend, and active rates.
+4. **Price Book Management**: Direct modal to configure rates per 1M tokens and inspect the versioned audit history.

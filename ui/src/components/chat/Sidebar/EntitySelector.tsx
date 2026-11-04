@@ -76,15 +76,17 @@ export function EntitySelector() {
       setTeamId(newValue)
       setAgentId(null)
       setWorkflowId(null)
+      const teamEntity = selectedEntity as { model?: { model?: string; provider?: string } }
       setSelectedModel(
-        (selectedEntity as { model?: { provider?: string } })?.model?.provider || ''
+        teamEntity?.model?.model || teamEntity?.model?.provider || ''
       )
     } else {
       setAgentId(newValue)
       setTeamId(null)
       setWorkflowId(null)
+      const agentEntity = selectedEntity as { model?: { model?: string; provider?: string } }
       setSelectedModel(
-        (selectedEntity as { model?: { provider?: string } })?.model?.provider || ''
+        agentEntity?.model?.model || agentEntity?.model?.provider || ''
       )
     }
 

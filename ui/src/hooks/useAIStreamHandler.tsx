@@ -22,6 +22,7 @@ const useAIChatStreamHandler = () => {
   const authToken = useStore((state) => state.authToken)
   const userId = useStore((state) => state.userId)
   const mode = useStore((state) => state.mode)
+  const selectedModel = useStore((state) => state.selectedModel)
   const setStreamingErrorMessage = useStore(
     (state) => state.setStreamingErrorMessage
   )
@@ -189,6 +190,9 @@ const useAIChatStreamHandler = () => {
         }
         if (userId) {
           headers['X-User-Id'] = userId
+        }
+        if (selectedModel && selectedModel !== 'Workflow Pipeline') {
+          headers['X-Model-Override'] = selectedModel
         }
 
         await streamResponse({
@@ -467,6 +471,7 @@ const useAIChatStreamHandler = () => {
       teamId,
       workflowId,
       mode,
+      selectedModel,
       setStreamingErrorMessage,
       setIsStreaming,
       focusChatInput,

@@ -410,6 +410,65 @@ export interface MetricsResponse {
   updated_at?: string
 }
 
+export interface AvailableModel {
+  id: string
+  provider: string
+}
+
+export interface ModelPriceRate {
+  model_id: string
+  provider: string
+  input_cost_per_m: number
+  output_cost_per_m: number
+  effective_from: string
+}
+
+export interface PricingResponse {
+  current_rates: ModelPriceRate[]
+  history: ModelPriceRate[]
+}
+
+export interface ProviderCostSummary {
+  provider: string
+  runs: number
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  total_cost: number
+  percentage: number
+}
+
+export interface ModelCostSummary {
+  model_id: string
+  provider: string
+  runs: number
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  total_cost: number
+}
+
+export interface DailyCostSummary {
+  date: string
+  runs: number
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  total_cost: number
+}
+
+export interface CostBreakdownResponse {
+  total_cost: number
+  total_runs: number
+  total_tokens: number
+  total_input_tokens: number
+  total_output_tokens: number
+  by_provider: ProviderCostSummary[]
+  by_model: ModelCostSummary[]
+  daily_history: DailyCostSummary[]
+  rates: ModelPriceRate[]
+}
+
 export interface EvalSchema {
   id: string
   agent_id?: string

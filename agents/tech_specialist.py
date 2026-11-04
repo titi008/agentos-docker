@@ -6,7 +6,7 @@ Tech Specialist
 from agno.agent import Agent
 
 from app.registry import shared_learning, shared_notes
-from app.settings import reasoning_model
+from app.settings import get_agent_model, model_override_hook, reasoning_model
 from db import get_postgres_db
 
 INSTRUCTIONS = """\
@@ -25,7 +25,8 @@ How you work:
 tech_specialist = Agent(
     id="tech-specialist",
     name="Tech Specialist",
-    model=reasoning_model(),
+    model=get_agent_model("tech-specialist", reasoning_model),
+    pre_hooks=[model_override_hook],
     db=get_postgres_db(),
     learning=shared_learning,
     user_id="anonymous-user",

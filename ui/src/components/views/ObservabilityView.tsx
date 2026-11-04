@@ -7,14 +7,19 @@ import {
   getTraceDetailAPI,
   getMetricsAPI,
   refreshMetricsAPI,
-  getEvalRunsAPI
+  getEvalRunsAPI,
+  getCostsAPI,
+  getPricingAPI,
+  updatePricingAPI
 } from '@/api/os'
 import {
   TraceSummary,
   TraceDetail,
   TraceNode,
   MetricsResponse,
-  EvalSchema
+  EvalSchema,
+  CostBreakdownResponse,
+  PricingResponse
 } from '@/types/os'
 import {
   Activity,
@@ -30,8 +35,15 @@ import {
   ChevronRight,
   ChevronDown,
   Zap,
-  Sparkles
+  Sparkles,
+  DollarSign,
+  Coins,
+  Edit3,
+  Save,
+  Tag
 } from 'lucide-react'
+import Icon from '@/components/ui/icon'
+import { getProviderIcon } from '@/lib/modelProvider'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { toast } from 'sonner'
@@ -199,6 +211,20 @@ export const ObservabilityView = () => {
   const [isMetricsLoading, setIsMetricsLoading] = useState(false)
   const [isRefreshingMetrics, setIsRefreshingMetrics] = useState(false)
 
+  // Costs & Pricing state
+  const [costsData, setCostsData] = useState<CostBreakdownResponse | null>(null)
+  const [pricingData, setPricingData] = useState<PricingResponse | null>(null)
+  const [isCostsLoading, setIsCostsLoading] = useState(false)
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false)
+  const [editingRate, setEditingRate] = useState<{
+    model_id: string
+    provider: string
+    input_cost_per_m: number
+    output_cost_per_m: number
+  } | null>(null)
+  const [isSavingRate, setIsSavingRate] = useState(false)
+  const [showRateHistory, setShowRateHistory] = useState(false)
+
   // Evals state
   const [evals, setEvals] = useState<EvalSchema[]>([])
   const [isEvalsLoading, setIsEvalsLoading] = useState(false)
@@ -225,6 +251,21 @@ export const ObservabilityView = () => {
     }
   }, [selectedEndpoint, authToken])
 
+  const fetchCosts = useCallback(async () => {
+    if (!selectedEndpoint) return
+    setIsCostsLoading(true)
+    try {
+      const [costRes, priceRes] = await Promise.all([
+        getCostsAPI(selectedEndpoint, authToken),
+        getPricingAPI(selectedEndpoint, authToken)
+      ])
+      if (costRes) setCostsData(costRes)
+      if (priceRes) setPricingData(priceRes)
+    } finally {
+      setIsCostsLoading(false)
+    }
+  }, [selectedEndpoint, authToken])
+
   const fetchEvals = useCallback(async () => {
     if (!selectedEndpoint) return
     setIsEvalsLoading(true)
@@ -238,9 +279,12 @@ export const ObservabilityView = () => {
 
   useEffect(() => {
     if (activeTab === 'traces') fetchTraces()
-    if (activeTab === 'metrics') fetchMetrics()
+    if (activeTab === 'metrics') {
+      fetchMetrics()
+      fetchCosts()
+    }
     if (activeTab === 'evals') fetchEvals()
-  }, [activeTab, fetchTraces, fetchMetrics, fetchEvals])
+  }, [activeTab, fetchTraces, fetchMetrics, fetchCosts, fetchEvals])
 
   const handleOpenTraceDetail = async (traceId: string) => {
     setIsDetailLoading(true)
@@ -262,12 +306,26 @@ export const ObservabilityView = () => {
       const ok = await refreshMetricsAPI(selectedEndpoint, authToken)
       if (ok) {
         toast.success('Metrics aggregation triggered')
-        await fetchMetrics()
+        await Promise.all([fetchMetrics(), fetchCosts()])
       } else {
         toast.error('Failed to trigger metrics refresh')
       }
     } finally {
       setIsRefreshingMetrics(false)
+    }
+  }
+
+  const handleSaveRate = async () => {
+    if (!editingRate || !selectedEndpoint) return
+    setIsSavingRate(true)
+    try {
+      const ok = await updatePricingAPI(selectedEndpoint, editingRate, authToken)
+      if (ok) {
+        setEditingRate(null)
+        await fetchCosts()
+      }
+    } finally {
+      setIsSavingRate(false)
     }
   }
 
@@ -477,33 +535,59 @@ export const ObservabilityView = () => {
           </div>
         )}
 
-        {/* METRICS TAB */}
+        {/* METRICS & COST TAB */}
         {activeTab === 'metrics' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-primary">
                   Token Throughput & Execution Costs
                 </h2>
                 <p className="text-xs text-muted">
-                  Aggregated from PostgreSQL storage on your AgentOS server.
+                  Aggregated from PostgreSQL storage on your AgentOS server with effective-dated pricing.
                 </p>
               </div>
 
-              <button
-                onClick={handleRefreshMetricsNow}
-                disabled={isRefreshingMetrics}
-                className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs text-primary hover:bg-primary/20 transition"
-              >
-                <RefreshCw
-                  className={`size-3.5 ${isRefreshingMetrics ? 'animate-spin' : ''}`}
-                />
-                Calculate & Refresh Metrics
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsPricingModalOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-accent/40 px-3 py-1.5 text-xs text-foreground hover:bg-accent hover:border-primary/40 transition"
+                >
+                  <Tag className="size-3.5 text-emerald-400" />
+                  Configure Model Pricing
+                </button>
+
+                <button
+                  onClick={handleRefreshMetricsNow}
+                  disabled={isRefreshingMetrics}
+                  className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs text-primary hover:bg-primary/20 transition"
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${isRefreshingMetrics ? 'animate-spin' : ''}`}
+                  />
+                  Calculate & Refresh Metrics
+                </button>
+              </div>
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {/* Total Estimated Cost */}
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4">
+                <span className="text-[11px] uppercase text-emerald-400 flex items-center gap-1.5">
+                  <DollarSign className="size-3.5" /> Total Estimated Spend
+                </span>
+                <div className="mt-2 text-2xl font-bold text-emerald-300">
+                  ${(costsData?.total_cost ?? 0).toFixed(4)}
+                </div>
+                <div className="text-[10px] text-muted mt-1">
+                  Avg / run: $
+                  {costsData && costsData.total_runs > 0
+                    ? (costsData.total_cost / costsData.total_runs).toFixed(5)
+                    : '0.00000'}
+                </div>
+              </div>
+
               <div className="rounded-xl border border-primary/15 bg-accent/30 p-4">
                 <span className="text-[11px] uppercase text-muted flex items-center gap-1.5">
                   <Zap className="size-3.5 text-amber-400" /> Total Agent Runs
@@ -527,11 +611,11 @@ export const ObservabilityView = () => {
                   <Cpu className="size-3.5 text-purple-400" /> Total Tokens
                 </span>
                 <div className="mt-2 text-2xl font-bold text-foreground">
-                  {totalTokens.toLocaleString()}
+                  {(costsData?.total_tokens ?? totalTokens).toLocaleString()}
                 </div>
                 <div className="text-[10px] text-muted mt-1">
-                  In: {inputTokens.toLocaleString()} | Out:{' '}
-                  {outputTokens.toLocaleString()}
+                  In: {(costsData?.total_input_tokens ?? inputTokens).toLocaleString()} | Out:{' '}
+                  {(costsData?.total_output_tokens ?? outputTokens).toLocaleString()}
                 </div>
               </div>
 
@@ -542,6 +626,161 @@ export const ObservabilityView = () => {
                 <div className="mt-2 text-2xl font-bold text-foreground">
                   {latestMetric?.users_count ?? 1}
                 </div>
+              </div>
+            </div>
+
+            {/* Provider Breakdown Cards */}
+            {costsData?.by_provider && costsData.by_provider.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-primary uppercase">
+                  Spend & Token Distribution by Provider
+                </h3>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {costsData.by_provider.map((prov) => {
+                    const iconName = getProviderIcon(prov.provider)
+                    return (
+                      <div
+                        key={prov.provider}
+                        className="rounded-xl border border-primary/15 bg-accent/25 p-3.5 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {iconName ? (
+                              <Icon type={iconName} size="xs" />
+                            ) : (
+                              <Coins className="size-3.5 text-primary" />
+                            )}
+                            <span className="text-xs font-semibold text-foreground">
+                              {prov.provider}
+                            </span>
+                          </div>
+                          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                            {prov.percentage}%
+                          </span>
+                        </div>
+
+                        <div className="text-lg font-bold text-emerald-400">
+                          ${prov.total_cost.toFixed(4)}
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-muted border-t border-primary/10 pt-2">
+                          <span>{prov.runs} runs</span>
+                          <span>
+                            {prov.total_tokens.toLocaleString()} tokens
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Model Usage & Cost Breakdown Table */}
+            <div className="rounded-xl border border-primary/15 bg-accent/20 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-semibold text-primary uppercase">
+                    Model Usage & Estimated Cost Breakdown
+                  </h3>
+                  <p className="text-[11px] text-muted">
+                    Token usage and estimated costs using versioned rates effective at the time of each run.
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead className="border-b border-primary/10 text-muted uppercase text-[10px]">
+                    <tr>
+                      <th className="py-2 font-medium">Model</th>
+                      <th className="py-2 font-medium">Provider</th>
+                      <th className="py-2 font-medium">Runs</th>
+                      <th className="py-2 font-medium">Input Tokens</th>
+                      <th className="py-2 font-medium">Output Tokens</th>
+                      <th className="py-2 font-medium">Total Tokens</th>
+                      <th className="py-2 font-medium">Estimated Cost</th>
+                      <th className="py-2 font-medium">Active Rate ($/1M)</th>
+                      <th className="py-2 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-primary/10">
+                    {!costsData?.by_model || costsData.by_model.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-6 text-center text-muted">
+                          {isCostsLoading
+                            ? 'Loading cost metrics...'
+                            : 'No model run records found yet.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      costsData.by_model.map((m) => {
+                        const currentRate = costsData.rates?.find(
+                          (r) => r.model_id === m.model_id
+                        )
+                        return (
+                          <tr key={m.model_id} className="hover:bg-accent/30 transition">
+                            <td className="py-2.5 font-medium text-primary">
+                              {m.model_id}
+                            </td>
+                            <td className="py-2.5 text-muted">
+                              {m.provider}
+                            </td>
+                            <td className="py-2.5 text-muted">
+                              {m.runs}
+                            </td>
+                            <td className="py-2.5 text-muted">
+                              {m.input_tokens.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 text-muted">
+                              {m.output_tokens.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 text-muted">
+                              {m.total_tokens.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 font-semibold text-emerald-400">
+                              ${m.total_cost.toFixed(4)}
+                            </td>
+                            <td className="py-2.5 text-[11px] text-muted">
+                              {currentRate ? (
+                                <span>
+                                  In: ${currentRate.input_cost_per_m} / Out: ${currentRate.output_cost_per_m}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="py-2.5 text-right">
+                              <button
+                                onClick={() => {
+                                  if (currentRate) {
+                                    setEditingRate({
+                                      model_id: currentRate.model_id,
+                                      provider: currentRate.provider,
+                                      input_cost_per_m: currentRate.input_cost_per_m,
+                                      output_cost_per_m: currentRate.output_cost_per_m
+                                    })
+                                  } else {
+                                    setEditingRate({
+                                      model_id: m.model_id,
+                                      provider: m.provider,
+                                      input_cost_per_m: 1.0,
+                                      output_cost_per_m: 2.0
+                                    })
+                                  }
+                                  setIsPricingModalOpen(true)
+                                }}
+                                className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] text-primary hover:bg-accent border border-primary/20 transition"
+                              >
+                                <Edit3 className="size-3" /> Edit Rate
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -603,6 +842,208 @@ export const ObservabilityView = () => {
                 </table>
               </div>
             </div>
+
+            {/* Pricing Management Modal */}
+            {isPricingModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
+                <div className="max-w-2xl w-full rounded-2xl border border-primary/20 bg-background p-6 space-y-4 max-h-[85vh] overflow-y-auto font-dmmono shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-primary/10 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Tag className="size-4 text-emerald-400" />
+                      <h3 className="text-sm font-semibold text-foreground">
+                        Model Pricing & Rate Management
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsPricingModalOpen(false)
+                        setEditingRate(null)
+                      }}
+                      className="rounded-lg p-1 text-muted hover:bg-accent hover:text-foreground"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+
+                  {/* Informational Callout */}
+                  <div className="rounded-xl border border-primary/15 bg-accent/20 p-3 text-xs text-muted space-y-1">
+                    <div className="font-semibold text-foreground flex items-center gap-1.5">
+                      <Sparkles className="size-3.5 text-primary" /> Immutable Effective-Dated Pricing
+                    </div>
+                    <p className="text-[11px] leading-relaxed">
+                      Updating a price rate takes effect <strong>only from this timestamp forward</strong>. Past runs remain calculated with the rate active when they occurred, preserving historical cost integrity.
+                    </p>
+                  </div>
+
+                  {/* Active Rates List / Editor */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold uppercase text-primary">
+                      Current Active Rates ($ / 1 Million Tokens)
+                    </h4>
+
+                    {editingRate && (
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-foreground">
+                            Update Rate for: <span className="text-primary">{editingRate.model_id}</span>
+                          </span>
+                          <span className="text-[10px] text-muted uppercase">
+                            Provider: {editingRate.provider}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] uppercase text-muted block mb-1">
+                              Input Cost / 1M ($)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingRate.input_cost_per_m}
+                              onChange={(e) =>
+                                setEditingRate({
+                                  ...editingRate,
+                                  input_cost_per_m: parseFloat(e.target.value) || 0
+                                })
+                              }
+                              className="w-full rounded-lg border border-primary/20 bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase text-muted block mb-1">
+                              Output Cost / 1M ($)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editingRate.output_cost_per_m}
+                              onChange={(e) =>
+                                setEditingRate({
+                                  ...editingRate,
+                                  output_cost_per_m: parseFloat(e.target.value) || 0
+                                })
+                              }
+                              className="w-full rounded-lg border border-primary/20 bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-hidden"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            onClick={() => setEditingRate(null)}
+                            className="rounded-lg px-3 py-1.5 text-xs text-muted hover:bg-accent"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveRate}
+                            disabled={isSavingRate}
+                            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-background hover:bg-primary/90 transition"
+                          >
+                            <Save className="size-3.5" />
+                            {isSavingRate ? 'Saving...' : 'Apply New Rate'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="overflow-x-auto rounded-xl border border-primary/10">
+                      <table className="w-full border-collapse text-left text-xs">
+                        <thead className="border-b border-primary/10 bg-accent/40 text-muted uppercase text-[10px]">
+                          <tr>
+                            <th className="p-2.5 font-medium">Model</th>
+                            <th className="p-2.5 font-medium">Provider</th>
+                            <th className="p-2.5 font-medium">Input $/1M</th>
+                            <th className="p-2.5 font-medium">Output $/1M</th>
+                            <th className="p-2.5 font-medium">Effective From</th>
+                            <th className="p-2.5 font-medium text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-primary/10">
+                          {pricingData?.current_rates.map((rate) => (
+                            <tr key={rate.model_id} className="hover:bg-accent/20 transition">
+                              <td className="p-2.5 font-medium text-primary">
+                                {rate.model_id}
+                              </td>
+                              <td className="p-2.5 text-muted">
+                                {rate.provider}
+                              </td>
+                              <td className="p-2.5 text-foreground">
+                                ${rate.input_cost_per_m}
+                              </td>
+                              <td className="p-2.5 text-foreground">
+                                ${rate.output_cost_per_m}
+                              </td>
+                              <td className="p-2.5 text-muted text-[10px]">
+                                {dayjs(rate.effective_from).format('YYYY-MM-DD HH:mm')}
+                              </td>
+                              <td className="p-2.5 text-right">
+                                <button
+                                  onClick={() =>
+                                    setEditingRate({
+                                      model_id: rate.model_id,
+                                      provider: rate.provider,
+                                      input_cost_per_m: rate.input_cost_per_m,
+                                      output_cost_per_m: rate.output_cost_per_m
+                                    })
+                                  }
+                                  className="text-[11px] text-primary hover:underline"
+                                >
+                                  Update
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Rate Change History Log */}
+                  <div className="border-t border-primary/10 pt-3">
+                    <button
+                      onClick={() => setShowRateHistory(!showRateHistory)}
+                      className="flex w-full items-center justify-between text-xs text-muted hover:text-foreground py-1"
+                    >
+                      <span className="font-semibold uppercase tracking-wider text-[10px]">
+                        Rate Change Audit History ({pricingData?.history.length ?? 0} versions)
+                      </span>
+                      {showRateHistory ? (
+                        <ChevronDown className="size-3.5" />
+                      ) : (
+                        <ChevronRight className="size-3.5" />
+                      )}
+                    </button>
+
+                    {showRateHistory && (
+                      <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-primary/10 text-[11px]">
+                        <table className="w-full text-left">
+                          <thead className="bg-accent/30 text-[10px] uppercase text-muted border-b border-primary/10">
+                            <tr>
+                              <th className="p-2">Model</th>
+                              <th className="p-2">Effective From</th>
+                              <th className="p-2">In $/1M</th>
+                              <th className="p-2">Out $/1M</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-primary/10 text-muted">
+                            {pricingData?.history.map((h, idx) => (
+                              <tr key={`${h.model_id}-${h.effective_from}-${idx}`}>
+                                <td className="p-2 text-primary">{h.model_id}</td>
+                                <td className="p-2">{dayjs(h.effective_from).format('YYYY-MM-DD HH:mm:ss')}</td>
+                                <td className="p-2">${h.input_cost_per_m}</td>
+                                <td className="p-2">${h.output_cost_per_m}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

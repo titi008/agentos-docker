@@ -22,6 +22,9 @@ export const APIRoutes = {
   GetMetrics: (agentOSUrl: string) => `${agentOSUrl}/metrics`,
   RefreshMetrics: (agentOSUrl: string) => `${agentOSUrl}/metrics/refresh`,
   GetEvalRuns: (agentOSUrl: string) => `${agentOSUrl}/eval-runs`,
+  GetPricing: (agentOSUrl: string) => `${agentOSUrl}/api/pricing`,
+  UpdatePricing: (agentOSUrl: string) => `${agentOSUrl}/api/pricing`,
+  GetCosts: (agentOSUrl: string) => `${agentOSUrl}/api/costs`,
 
   // Memory & Learnings
   GetMemories: (agentOSUrl: string) => `${agentOSUrl}/memories`,
@@ -111,5 +114,10 @@ export const APIRoutes = {
     `${agentOSUrl}/filesystem/entries`,
   GetFilesystemContent: (agentOSUrl: string) =>
     `${agentOSUrl}/filesystem/content`,
-  SearchFilesystem: (agentOSUrl: string) => `${agentOSUrl}/filesystem/search`
+  SearchFilesystem: (agentOSUrl: string) => `${agentOSUrl}/filesystem/search`,
+
+  // Models
+  GetModels: (agentOSUrl: string) => `${agentOSUrl}/api/models`,
+  UpdateAgentModel: (agentOSUrl: string, agentId: string) =>
+    `${agentOSUrl}/api/agents/${agentId}/model`
 }

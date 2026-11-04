@@ -6,7 +6,7 @@ Market Researcher
 from agno.agent import Agent
 
 from app.registry import get_web_tools, shared_learning
-from app.settings import fast_model
+from app.settings import fast_model, get_agent_model, model_override_hook
 from db import get_postgres_db
 
 INSTRUCTIONS = """\
@@ -25,7 +25,8 @@ How you work:
 market_researcher = Agent(
     id="market-researcher",
     name="Market Researcher",
-    model=fast_model(),
+    model=get_agent_model("market-researcher", fast_model),
+    pre_hooks=[model_override_hook],
     db=get_postgres_db(),
     learning=shared_learning,
     user_id="anonymous-user",

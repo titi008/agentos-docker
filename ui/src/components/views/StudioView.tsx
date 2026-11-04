@@ -12,7 +12,9 @@ import {
   createComponentConfigAPI,
   setCurrentComponentConfigAPI,
   deleteComponentAPI,
-  getRegistryAPI
+  getRegistryAPI,
+  getAvailableModelsAPI,
+  updateAgentModelAPI
 } from '@/api/os'
 import {
   AgentDetails,
@@ -20,7 +22,8 @@ import {
   WorkflowSummaryResponse,
   ComponentResponse,
   ComponentConfigResponse,
-  RegistryContentResponse
+  RegistryContentResponse,
+  AvailableModel
 } from '@/types/os'
 import {
   LayoutGrid,
@@ -86,9 +89,39 @@ export const StudioView = () => {
 
   // Detail Inspection States
   const [selectedAgentDetail, setSelectedAgentDetail] = useState<AgentDetails | null>(null)
+  const [selectedAgentModel, setSelectedAgentModel] = useState<string>('')
+  const [isUpdatingModel, setIsUpdatingModel] = useState<boolean>(false)
+  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([
+    { id: 'claude-sonnet-5-5', provider: 'Anthropic' },
+    { id: 'claude-opus-5-5', provider: 'Anthropic' },
+    { id: 'claude-haiku-5-5', provider: 'Anthropic' },
+    { id: 'gemini-4-argon', provider: 'Google' },
+    { id: 'gemini-3.8-flash', provider: 'Google' },
+    { id: 'gpt-6.1-sol', provider: 'OpenAI' }
+  ])
   const [selectedTeamDetail, setSelectedTeamDetail] = useState<TeamDetails | null>(null)
   const [selectedWorkflowDetail, setSelectedWorkflowDetail] = useState<WorkflowSummaryResponse | null>(null)
   const [selectedRegistryDetail, setSelectedRegistryDetail] = useState<RegistryContentResponse | null>(null)
+
+  useEffect(() => {
+    if (selectedAgentDetail) {
+      setSelectedAgentModel(selectedAgentDetail.model?.model || '')
+    }
+  }, [selectedAgentDetail])
+
+  useEffect(() => {
+    let isMounted = true
+    if (selectedEndpoint) {
+      getAvailableModelsAPI(selectedEndpoint, authToken).then((res) => {
+        if (isMounted && res && res.length > 0) {
+          setAvailableModels(res)
+        }
+      })
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [selectedEndpoint, authToken])
 
   // Create Modals
   const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false)
@@ -1411,18 +1444,69 @@ export const StudioView = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                  Underlying Model
-                </label>
-                <div className="mt-1 flex items-center gap-2 rounded-xl border border-primary/15 bg-accent/30 p-2.5">
-                  <span className="font-semibold text-foreground">
-                    {selectedAgentDetail.model?.provider || 'LLM'}
-                  </span>
-                  <span className="text-muted">•</span>
-                  <span className="text-muted font-mono">
-                    {selectedAgentDetail.model?.model || 'Default Model'}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                    Underlying Model
+                  </label>
+                  {selectedAgentModel &&
+                    selectedAgentDetail.model?.model &&
+                    selectedAgentModel !== selectedAgentDetail.model.model && (
+                      <span className="text-[10px] font-medium text-amber-400">
+                        Unsaved change
+                      </span>
+                    )}
                 </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <select
+                    value={selectedAgentModel}
+                    onChange={(e) => setSelectedAgentModel(e.target.value)}
+                    className="h-9 flex-1 rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+                  >
+                    {availableModels.map((m) => (
+                      <option key={m.id} value={m.id} className="bg-background text-foreground">
+                        {m.id} ({m.provider})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={
+                      isUpdatingModel ||
+                      !selectedAgentModel ||
+                      selectedAgentModel === selectedAgentDetail.model?.model
+                    }
+                    onClick={async () => {
+                      setIsUpdatingModel(true)
+                      const success = await updateAgentModelAPI(
+                        selectedEndpoint,
+                        selectedAgentDetail.id,
+                        selectedAgentModel,
+                        authToken
+                      )
+                      setIsUpdatingModel(false)
+                      if (success) {
+                        const matchedProvider =
+                          availableModels.find((m) => m.id === selectedAgentModel)
+                            ?.provider || 'Unknown'
+                        setSelectedAgentDetail({
+                          ...selectedAgentDetail,
+                          model: {
+                            name: selectedAgentModel,
+                            model: selectedAgentModel,
+                            provider: matchedProvider
+                          }
+                        })
+                        refreshAll()
+                      }
+                    }}
+                    className="h-9 rounded-xl bg-primary px-3 text-xs font-semibold text-background hover:bg-primary/90 disabled:opacity-40"
+                  >
+                    {isUpdatingModel ? 'Updating...' : 'Update Model'}
+                  </button>
+                </div>
+                <p className="mt-1 text-[10px] text-muted">
+                  Persists across server restarts in <code className="text-foreground">data/agent_model_overrides.json</code>.
+                </p>
               </div>
 
               <div>
