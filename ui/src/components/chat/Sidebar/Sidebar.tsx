@@ -262,6 +262,7 @@ const SidebarContent = ({
   const [workflowId] = useQueryState('workflow')
 
   // Collapsible accordion states
+  const [isSessionsOpen, setIsSessionsOpen] = useState(true)
   const [isStudioOpen, setIsStudioOpen] = useState(true)
   const [isObservabilityOpen, setIsObservabilityOpen] = useState(false)
   const [isFeaturesOpen, setIsFeaturesOpen] = useState(false)
@@ -485,10 +486,19 @@ const SidebarContent = ({
                 )}
 
                 <div className="pt-1">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted pb-1.5">
-                    Recent Sessions
-                  </div>
-                  <Sessions />
+                  <button
+                    type="button"
+                    onClick={() => setIsSessionsOpen(!isSessionsOpen)}
+                    className="flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted hover:text-foreground pb-1.5 transition"
+                  >
+                    <span>Recent Sessions</span>
+                    {isSessionsOpen ? (
+                      <ChevronDown className="size-3" />
+                    ) : (
+                      <ChevronRight className="size-3" />
+                    )}
+                  </button>
+                  {isSessionsOpen && <Sessions />}
                 </div>
               </div>
             )}
