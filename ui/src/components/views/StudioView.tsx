@@ -38,7 +38,8 @@ import {
   Code,
   Database,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Copy
 } from 'lucide-react'
 import { useQueryState } from 'nuqs'
 import { toast } from 'sonner'
@@ -82,6 +83,12 @@ export const StudioView = () => {
   const [isConfigLoading, setIsConfigLoading] = useState(false)
   const [editingInstructions, setEditingInstructions] = useState('')
   const [editingNotes, setEditingNotes] = useState('')
+
+  // Detail Inspection States
+  const [selectedAgentDetail, setSelectedAgentDetail] = useState<AgentDetails | null>(null)
+  const [selectedTeamDetail, setSelectedTeamDetail] = useState<TeamDetails | null>(null)
+  const [selectedWorkflowDetail, setSelectedWorkflowDetail] = useState<WorkflowSummaryResponse | null>(null)
+  const [selectedRegistryDetail, setSelectedRegistryDetail] = useState<RegistryContentResponse | null>(null)
 
   // Create Modals
   const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false)
@@ -532,7 +539,8 @@ export const StudioView = () => {
                   {dbAgents.map((comp) => (
                     <div
                       key={comp.id}
-                      className="rounded-2xl border border-primary/20 bg-accent/20 p-4 hover:border-primary/40 transition flex flex-col justify-between"
+                      onClick={() => handleInspectComponent(comp)}
+                      className="rounded-2xl border border-primary/20 bg-accent/20 p-4 hover:border-primary/50 hover:bg-accent/30 transition flex flex-col justify-between cursor-pointer"
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-2">
@@ -549,14 +557,14 @@ export const StudioView = () => {
                       </div>
 
                       <div className="flex items-center justify-between border-t border-primary/10 pt-3 mt-2 text-xs">
+                        <span className="flex items-center gap-1 text-[11px] text-muted hover:text-foreground">
+                          <History className="size-3" /> Inspect & Versions
+                        </span>
                         <button
-                          onClick={() => handleInspectComponent(comp)}
-                          className="flex items-center gap-1 text-muted hover:text-foreground"
-                        >
-                          <History className="size-3" /> Version History
-                        </button>
-                        <button
-                          onClick={() => handleLaunchAgentInChat(comp.component_id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleLaunchAgentInChat(comp.component_id)
+                          }}
                           className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-background hover:bg-primary/90"
                         >
                           <Play className="size-3" /> Chat
@@ -577,7 +585,8 @@ export const StudioView = () => {
                 {filteredAgents.map((agent) => (
                   <div
                     key={agent.id}
-                    className="rounded-2xl border border-primary/15 bg-accent/20 p-4 hover:border-primary/30 transition flex flex-col justify-between"
+                    onClick={() => setSelectedAgentDetail(agent)}
+                    className="rounded-2xl border border-primary/15 bg-accent/20 p-4 hover:border-primary/50 hover:bg-accent/30 transition flex flex-col justify-between cursor-pointer"
                   >
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
@@ -606,9 +615,15 @@ export const StudioView = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end border-t border-primary/10 pt-3 mt-2 text-xs">
+                    <div className="flex items-center justify-between border-t border-primary/10 pt-3 mt-2 text-xs">
+                      <span className="text-[11px] text-muted hover:text-foreground">
+                        View details →
+                      </span>
                       <button
-                        onClick={() => handleLaunchAgentInChat(agent.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleLaunchAgentInChat(agent.id)
+                        }}
                         className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-background hover:bg-primary/90"
                       >
                         <Play className="size-3" /> Chat
@@ -633,7 +648,8 @@ export const StudioView = () => {
                   {dbTeams.map((comp) => (
                     <div
                       key={comp.id}
-                      className="rounded-2xl border border-primary/20 bg-accent/20 p-4 hover:border-primary/40 transition flex flex-col justify-between"
+                      onClick={() => handleInspectComponent(comp)}
+                      className="rounded-2xl border border-primary/20 bg-accent/20 p-4 hover:border-primary/50 hover:bg-accent/30 transition flex flex-col justify-between cursor-pointer"
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-2">
@@ -650,14 +666,14 @@ export const StudioView = () => {
                       </div>
 
                       <div className="flex items-center justify-between border-t border-primary/10 pt-3 mt-2 text-xs">
+                        <span className="flex items-center gap-1 text-[11px] text-muted hover:text-foreground">
+                          <History className="size-3" /> Inspect & Versions
+                        </span>
                         <button
-                          onClick={() => handleInspectComponent(comp)}
-                          className="flex items-center gap-1 text-muted hover:text-foreground"
-                        >
-                          <History className="size-3" /> Versions
-                        </button>
-                        <button
-                          onClick={() => handleLaunchTeamInChat(comp.component_id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleLaunchTeamInChat(comp.component_id)
+                          }}
                           className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-background hover:bg-primary/90"
                         >
                           <Play className="size-3" /> Chat with Team
@@ -677,7 +693,8 @@ export const StudioView = () => {
                 {filteredTeams.map((team) => (
                   <div
                     key={team.id}
-                    className="rounded-2xl border border-primary/15 bg-accent/20 p-4 hover:border-primary/30 transition flex flex-col justify-between"
+                    onClick={() => setSelectedTeamDetail(team)}
+                    className="rounded-2xl border border-primary/15 bg-accent/20 p-4 hover:border-primary/50 hover:bg-accent/30 transition flex flex-col justify-between cursor-pointer"
                   >
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
@@ -706,9 +723,15 @@ export const StudioView = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end border-t border-primary/10 pt-3 mt-2 text-xs">
+                    <div className="flex items-center justify-between border-t border-primary/10 pt-3 mt-2 text-xs">
+                      <span className="text-[11px] text-muted hover:text-foreground">
+                        View details →
+                      </span>
                       <button
-                        onClick={() => handleLaunchTeamInChat(team.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleLaunchTeamInChat(team.id)
+                        }}
                         className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-background hover:bg-primary/90"
                       >
                         <Play className="size-3" /> Chat with Team
@@ -1327,6 +1350,447 @@ export const StudioView = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* AGENT DETAIL MODAL */}
+      {selectedAgentDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="flex flex-col w-full max-w-lg max-h-[85vh] rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <User className="size-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-primary truncate max-w-[260px]">
+                    {selectedAgentDetail.name || selectedAgentDetail.id}
+                  </h3>
+                  <span className="text-[10px] rounded bg-emerald-500/20 px-1.5 py-0.5 text-emerald-400 font-semibold">
+                    Code-Defined Agent
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedAgentDetail(null)}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto my-4 space-y-4 pr-1 text-xs">
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Agent ID
+                </label>
+                <div className="mt-1 flex items-center justify-between rounded-xl border border-primary/15 bg-accent/30 p-2.5 font-mono text-[11px] text-foreground">
+                  <span className="truncate">{selectedAgentDetail.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedAgentDetail.id)
+                      toast.success('Agent ID copied')
+                    }}
+                    className="text-muted hover:text-foreground"
+                    title="Copy ID"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Description / Role
+                </label>
+                <div className="mt-1 rounded-xl border border-primary/15 bg-accent/20 p-3 text-muted leading-relaxed">
+                  {selectedAgentDetail.description || selectedAgentDetail.role || 'No role description provided.'}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Underlying Model
+                </label>
+                <div className="mt-1 flex items-center gap-2 rounded-xl border border-primary/15 bg-accent/30 p-2.5">
+                  <span className="font-semibold text-foreground">
+                    {selectedAgentDetail.model?.provider || 'LLM'}
+                  </span>
+                  <span className="text-muted">•</span>
+                  <span className="text-muted font-mono">
+                    {selectedAgentDetail.model?.model || 'Default Model'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Attached Tools ({selectedAgentDetail.tools?.length || 0})
+                </label>
+                {selectedAgentDetail.tools && selectedAgentDetail.tools.length > 0 ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {selectedAgentDetail.tools.map((t, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-lg border border-primary/15 bg-accent/40 px-2 py-1 font-mono text-[11px] text-foreground"
+                      >
+                        {typeof t === 'string' ? t : (t as { name?: string })?.name || `Tool ${idx + 1}`}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-muted text-[11px] italic">
+                    No tools attached (Core LLM capabilities).
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-primary/15 pt-3">
+              <button
+                type="button"
+                onClick={() => setSelectedAgentDetail(null)}
+                className="rounded-xl border border-primary/15 px-4 py-1.5 text-xs text-muted hover:text-foreground"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = selectedAgentDetail.id
+                  setSelectedAgentDetail(null)
+                  handleLaunchAgentInChat(id)
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-xs font-semibold text-background hover:bg-primary/90"
+              >
+                <Play className="size-3.5" /> Chat with Agent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TEAM DETAIL MODAL */}
+      {selectedTeamDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="flex flex-col w-full max-w-lg max-h-[85vh] rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Users className="size-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-primary truncate max-w-[260px]">
+                    {selectedTeamDetail.name || selectedTeamDetail.id}
+                  </h3>
+                  <span className="text-[10px] rounded bg-emerald-500/20 px-1.5 py-0.5 text-emerald-400 font-semibold">
+                    Code-Defined Team
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTeamDetail(null)}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto my-4 space-y-4 pr-1 text-xs">
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Team ID
+                </label>
+                <div className="mt-1 flex items-center justify-between rounded-xl border border-primary/15 bg-accent/30 p-2.5 font-mono text-[11px] text-foreground">
+                  <span className="truncate">{selectedTeamDetail.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedTeamDetail.id)
+                      toast.success('Team ID copied')
+                    }}
+                    className="text-muted hover:text-foreground"
+                    title="Copy ID"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Description
+                </label>
+                <div className="mt-1 rounded-xl border border-primary/15 bg-accent/20 p-3 text-muted leading-relaxed">
+                  {selectedTeamDetail.description || 'Autonomous multi-agent coordination unit.'}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Leader Model
+                </label>
+                <div className="mt-1 flex items-center gap-2 rounded-xl border border-primary/15 bg-accent/30 p-2.5">
+                  <span className="font-semibold text-foreground">
+                    {selectedTeamDetail.model?.provider || 'LLM'}
+                  </span>
+                  <span className="text-muted">•</span>
+                  <span className="text-muted font-mono">
+                    {selectedTeamDetail.model?.model || 'Default Model'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Team Members ({selectedTeamDetail.members?.length || 0})
+                </label>
+                {selectedTeamDetail.members && selectedTeamDetail.members.length > 0 ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {selectedTeamDetail.members.map((m, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-lg border border-primary/15 bg-accent/40 px-2 py-1 font-mono text-[11px] text-foreground"
+                      >
+                        {typeof m === 'string' ? m : (m as { name?: string; id?: string })?.name || (m as { id?: string })?.id || `Member ${idx + 1}`}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-muted text-[11px] italic">
+                    Configured with dynamic task specialists.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-primary/15 pt-3">
+              <button
+                type="button"
+                onClick={() => setSelectedTeamDetail(null)}
+                className="rounded-xl border border-primary/15 px-4 py-1.5 text-xs text-muted hover:text-foreground"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = selectedTeamDetail.id
+                  setSelectedTeamDetail(null)
+                  handleLaunchTeamInChat(id)
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-xs font-semibold text-background hover:bg-primary/90"
+              >
+                <Play className="size-3.5" /> Chat with Team
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WORKFLOW DETAIL MODAL */}
+      {selectedWorkflowDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="flex flex-col w-full max-w-lg max-h-[85vh] rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <GitBranch className="size-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-primary truncate max-w-[260px]">
+                    {selectedWorkflowDetail.name || selectedWorkflowDetail.id}
+                  </h3>
+                  <span className="text-[10px] rounded bg-sky-500/20 px-1.5 py-0.5 text-sky-400 font-semibold">
+                    v{selectedWorkflowDetail.current_version || 1} • Workflow
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedWorkflowDetail(null)}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto my-4 space-y-4 pr-1 text-xs">
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Workflow ID
+                </label>
+                <div className="mt-1 flex items-center justify-between rounded-xl border border-primary/15 bg-accent/30 p-2.5 font-mono text-[11px] text-foreground">
+                  <span className="truncate">{selectedWorkflowDetail.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedWorkflowDetail.id)
+                      toast.success('Workflow ID copied')
+                    }}
+                    className="text-muted hover:text-foreground"
+                    title="Copy ID"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Description
+                </label>
+                <div className="mt-1 rounded-xl border border-primary/15 bg-accent/20 p-3 text-muted leading-relaxed">
+                  {selectedWorkflowDetail.description || 'Deterministic multi-step execution pipeline.'}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Pipeline Execution Steps ({selectedWorkflowDetail.steps?.length || 0})
+                </label>
+                {selectedWorkflowDetail.steps && selectedWorkflowDetail.steps.length > 0 ? (
+                  <div className="mt-1.5 space-y-1.5">
+                    {selectedWorkflowDetail.steps.map((st, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between rounded-xl border border-primary/10 bg-accent/30 p-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex size-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                            {idx + 1}
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            {st.name || `Step ${idx + 1}`}
+                          </span>
+                        </div>
+                        <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-mono text-zinc-300 capitalize">
+                          {st.executor_type || 'Step'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-muted text-[11px] italic">
+                    Pipeline steps orchestrated dynamically in code.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-primary/15 pt-3">
+              <button
+                type="button"
+                onClick={() => setSelectedWorkflowDetail(null)}
+                className="rounded-xl border border-primary/15 px-4 py-1.5 text-xs text-muted hover:text-foreground"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = selectedWorkflowDetail.id
+                  setSelectedWorkflowDetail(null)
+                  handleLaunchWorkflowInChat(id)
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-xs font-semibold text-background hover:bg-primary/90"
+              >
+                <Play className="size-3.5" /> Run in Chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REGISTRY RESOURCE DETAIL MODAL */}
+      {selectedRegistryDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="flex flex-col w-full max-w-lg max-h-[85vh] rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-[#f25f38]/10 text-[#f25f38]">
+                  <Boxes className="size-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-primary truncate max-w-[260px]">
+                    {selectedRegistryDetail.name}
+                  </h3>
+                  <span className="text-[10px] rounded bg-accent px-1.5 py-0.5 text-zinc-300 font-mono capitalize">
+                    {selectedRegistryDetail.type} Resource
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedRegistryDetail(null)}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto my-4 space-y-4 pr-1 text-xs">
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Resource Identifier
+                </label>
+                <div className="mt-1 flex items-center justify-between rounded-xl border border-primary/15 bg-accent/30 p-2.5 font-mono text-[11px] text-foreground">
+                  <span className="truncate">{selectedRegistryDetail.id || selectedRegistryDetail.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedRegistryDetail.id || selectedRegistryDetail.name)
+                      toast.success('Resource ID copied')
+                    }}
+                    className="text-muted hover:text-foreground"
+                    title="Copy ID"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Description & Capabilities
+                </label>
+                <div className="mt-1 rounded-xl border border-primary/15 bg-accent/20 p-3 text-muted leading-relaxed">
+                  {selectedRegistryDetail.description || 'Platform component available for agents, teams, and workflows.'}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Execution Environment
+                </label>
+                <div className="mt-1 flex items-center justify-between rounded-xl border border-primary/15 bg-accent/30 p-2.5">
+                  <span className="text-muted">Sandbox Isolation</span>
+                  <span className={`text-[11px] font-semibold ${selectedRegistryDetail.sandboxed ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {selectedRegistryDetail.sandboxed ? 'Enabled (Docker Sandbox)' : 'Direct Host Execution'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-primary/15 pt-3">
+              <button
+                type="button"
+                onClick={() => setSelectedRegistryDetail(null)}
+                className="rounded-xl border border-primary/15 px-4 py-1.5 text-xs text-muted hover:text-foreground"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedRegistryDetail.id || selectedRegistryDetail.name)
+                  toast.success('Resource ID copied')
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-xs font-semibold text-background hover:bg-primary/90"
+              >
+                <Copy className="size-3.5" /> Copy Resource ID
+              </button>
+            </div>
           </div>
         </div>
       )}
