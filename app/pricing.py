@@ -239,20 +239,31 @@ def compute_cost_breakdown() -> dict[str, Any]:
     # Query PostgreSQL runs table if reachable
     try:
         db = get_postgres_db()
-        engine = getattr(db, "_engine", None)
+        engine = getattr(db, "db_engine", getattr(db, "_engine", None))
         if engine is not None:
             with engine.connect() as conn:
                 # Query distinct run data from agno_runs
-                query = text("""
+                table_name = getattr(db, "runs_table_name", "agno_runs")
+                query = text(f"""
                     SELECT 
                         agent_id, team_id, run_data, created_at
-                    FROM agno_runs
+                    FROM {table_name}
                     ORDER BY created_at ASC
                 """)
                 rows = conn.execute(query).fetchall()
 
                 for row in rows:
-                    run_data = row[2] if isinstance(row[2], dict) else {}
+                    raw_data = row[2]
+                    if isinstance(raw_data, dict):
+                        run_data = raw_data
+                    elif isinstance(raw_data, str):
+                        try:
+                            run_data = json.loads(raw_data)
+                        except Exception:
+                            run_data = {}
+                    else:
+                        run_data = {}
+
                     created_at_val = row[3]
 
                     # Parse timestamp

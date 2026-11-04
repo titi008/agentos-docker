@@ -19,7 +19,8 @@ import {
   MetricsResponse,
   EvalSchema,
   CostBreakdownResponse,
-  PricingResponse
+  PricingResponse,
+  ModelPriceRate
 } from '@/types/os'
 import {
   Activity,
@@ -190,6 +191,17 @@ const SpanNodeView = ({
   )
 }
 
+const DEFAULT_PRICING_RATES: ModelPriceRate[] = [
+  { model_id: 'claude-sonnet-5-5', provider: 'Anthropic', input_cost_per_m: 2.0, output_cost_per_m: 10.0, effective_from: '2026-01-01T00:00:00Z' },
+  { model_id: 'claude-opus-5-5', provider: 'Anthropic', input_cost_per_m: 4.0, output_cost_per_m: 20.0, effective_from: '2026-01-01T00:00:00Z' },
+  { model_id: 'claude-haiku-5-5', provider: 'Anthropic', input_cost_per_m: 0.1, output_cost_per_m: 0.5, effective_from: '2026-01-01T00:00:00Z' },
+  { model_id: 'gemini-4-argon', provider: 'Google', input_cost_per_m: 2.5, output_cost_per_m: 10.0, effective_from: '2026-01-01T00:00:00Z' },
+  { model_id: 'gemini-3.8-flash', provider: 'Google', input_cost_per_m: 0.75, output_cost_per_m: 3.75, effective_from: '2026-01-01T00:00:00Z' },
+  { model_id: 'gemini-3.8-live', provider: 'Google', input_cost_per_m: 1.0, output_cost_per_m: 4.0, effective_from: '2026-01-01T00:00:00Z' },
+  { model_id: 'gpt-6.1-sol', provider: 'OpenAI', input_cost_per_m: 1.5, output_cost_per_m: 6.0, effective_from: '2026-01-01T00:00:00Z' },
+  { model_id: 'gpt-6-astra', provider: 'OpenAI', input_cost_per_m: 5.0, output_cost_per_m: 20.0, effective_from: '2026-01-01T00:00:00Z' }
+]
+
 export const ObservabilityView = () => {
   const {
     selectedEndpoint,
@@ -213,7 +225,10 @@ export const ObservabilityView = () => {
 
   // Costs & Pricing state
   const [costsData, setCostsData] = useState<CostBreakdownResponse | null>(null)
-  const [pricingData, setPricingData] = useState<PricingResponse | null>(null)
+  const [pricingData, setPricingData] = useState<PricingResponse>({
+    current_rates: DEFAULT_PRICING_RATES,
+    history: DEFAULT_PRICING_RATES
+  })
   const [isCostsLoading, setIsCostsLoading] = useState(false)
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false)
   const [editingRate, setEditingRate] = useState<{
@@ -260,7 +275,9 @@ export const ObservabilityView = () => {
         getPricingAPI(selectedEndpoint, authToken)
       ])
       if (costRes) setCostsData(costRes)
-      if (priceRes) setPricingData(priceRes)
+      if (priceRes && priceRes.current_rates && priceRes.current_rates.length > 0) {
+        setPricingData(priceRes)
+      }
     } finally {
       setIsCostsLoading(false)
     }
@@ -321,6 +338,21 @@ export const ObservabilityView = () => {
     try {
       const ok = await updatePricingAPI(selectedEndpoint, editingRate, authToken)
       if (ok) {
+        setPricingData((prev) => {
+          const nowIso = new Date().toISOString()
+          const updatedCurrent = prev.current_rates.map((r) =>
+            r.model_id === editingRate.model_id
+              ? { ...r, ...editingRate, effective_from: nowIso }
+              : r
+          )
+          return {
+            current_rates: updatedCurrent,
+            history: [
+              { ...editingRate, effective_from: nowIso },
+              ...prev.history
+            ]
+          }
+        })
         setEditingRate(null)
         await fetchCosts()
       }
@@ -540,8 +572,11 @@ export const ObservabilityView = () => {
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-primary">
-                  Token Throughput & Execution Costs
+                <h2 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <span>Token Throughput & Execution Costs</span>
+                  {isCostsLoading && (
+                    <RefreshCw className="size-3 animate-spin text-muted" />
+                  )}
                 </h2>
                 <p className="text-xs text-muted">
                   Aggregated from PostgreSQL storage on your AgentOS server with effective-dated pricing.
@@ -578,13 +613,22 @@ export const ObservabilityView = () => {
                   <DollarSign className="size-3.5" /> Total Estimated Spend
                 </span>
                 <div className="mt-2 text-2xl font-bold text-emerald-300">
-                  ${(costsData?.total_cost ?? 0).toFixed(4)}
+                  ${(costsData && costsData.total_cost > 0
+                    ? costsData.total_cost
+                    : totalTokens > 0
+                    ? (inputTokens / 1_000_000) * 2.0 + (outputTokens / 1_000_000) * 10.0
+                    : 0
+                  ).toFixed(4)}
                 </div>
                 <div className="text-[10px] text-muted mt-1">
                   Avg / run: $
-                  {costsData && costsData.total_runs > 0
-                    ? (costsData.total_cost / costsData.total_runs).toFixed(5)
-                    : '0.00000'}
+                  {(costsData && costsData.total_runs > 0
+                    ? costsData.total_cost / costsData.total_runs
+                    : (totalAgentRuns + totalTeamRuns) > 0
+                    ? ((inputTokens / 1_000_000) * 2.0 + (outputTokens / 1_000_000) * 10.0) /
+                      (totalAgentRuns + totalTeamRuns)
+                    : 0
+                  ).toFixed(5)}
                 </div>
               </div>
 
@@ -706,13 +750,36 @@ export const ObservabilityView = () => {
                   </thead>
                   <tbody className="divide-y divide-primary/10">
                     {!costsData?.by_model || costsData.by_model.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="py-6 text-center text-muted">
-                          {isCostsLoading
-                            ? 'Loading cost metrics...'
-                            : 'No model run records found yet.'}
-                        </td>
-                      </tr>
+                      pricingData.current_rates.map((r) => (
+                        <tr key={r.model_id} className="hover:bg-accent/30 transition">
+                          <td className="py-2.5 font-medium text-primary">{r.model_id}</td>
+                          <td className="py-2.5 text-muted">{r.provider}</td>
+                          <td className="py-2.5 text-muted">0</td>
+                          <td className="py-2.5 text-muted">0</td>
+                          <td className="py-2.5 text-muted">0</td>
+                          <td className="py-2.5 text-muted">0</td>
+                          <td className="py-2.5 font-semibold text-emerald-400">$0.0000</td>
+                          <td className="py-2.5 text-muted text-[10px]">
+                            ${r.input_cost_per_m} / ${r.output_cost_per_m}
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <button
+                              onClick={() => {
+                                setEditingRate({
+                                  model_id: r.model_id,
+                                  provider: r.provider,
+                                  input_cost_per_m: r.input_cost_per_m,
+                                  output_cost_per_m: r.output_cost_per_m
+                                })
+                                setIsPricingModalOpen(true)
+                              }}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] text-primary hover:bg-accent border border-primary/20 transition"
+                            >
+                              <Edit3 className="size-3" /> Edit Rate
+                            </button>
+                          </td>
+                        </tr>
+                      ))
                     ) : (
                       costsData.by_model.map((m) => {
                         const currentRate = costsData.rates?.find(

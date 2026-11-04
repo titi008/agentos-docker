@@ -106,6 +106,7 @@ async def get_available_models_endpoint() -> list[dict]:
     return [{"id": m.id, "provider": getattr(m, "provider", "Unknown")} for m in models]
 
 
+@app.post("/agents/{agent_id}/model")
 @app.post("/api/agents/{agent_id}/model")
 async def update_agent_model_endpoint(agent_id: str, payload: UpdateAgentModelPayload) -> dict:
     """Update and persist the model for an application agent."""
@@ -136,6 +137,7 @@ class UpdatePriceRequest(BaseModel):
     provider: str | None = None
 
 
+@app.get("/pricing")
 @app.get("/api/pricing")
 async def get_pricing() -> dict:
     """Return active model rates and rate change history."""
@@ -145,6 +147,7 @@ async def get_pricing() -> dict:
     }
 
 
+@app.post("/pricing")
 @app.post("/api/pricing")
 async def update_pricing(payload: UpdatePriceRequest) -> dict:
     """Update pricing for a model effective immediately, leaving past runs unchanged."""
@@ -157,6 +160,7 @@ async def update_pricing(payload: UpdatePriceRequest) -> dict:
     return {"status": "success", "rate": rate.to_dict()}
 
 
+@app.get("/costs")
 @app.get("/api/costs")
 async def get_costs() -> dict:
     """Return aggregated token and cost breakdown per model, provider, and day."""

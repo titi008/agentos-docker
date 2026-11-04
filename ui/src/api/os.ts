@@ -317,10 +317,16 @@ export const getPricingAPI = async (
   authToken?: string
 ): Promise<PricingResponse | null> => {
   try {
-    const response = await fetch(APIRoutes.GetPricing(endpoint), {
+    let response = await fetch(APIRoutes.GetPricing(endpoint), {
       method: 'GET',
       headers: createHeaders(authToken)
     })
+    if (response.status === 404) {
+      response = await fetch(`${endpoint}/pricing`, {
+        method: 'GET',
+        headers: createHeaders(authToken)
+      })
+    }
     if (!response.ok) return null
     return response.json()
   } catch {
@@ -334,11 +340,18 @@ export const updatePricingAPI = async (
   authToken?: string
 ): Promise<boolean> => {
   try {
-    const response = await fetch(APIRoutes.UpdatePricing(endpoint), {
+    let response = await fetch(APIRoutes.UpdatePricing(endpoint), {
       method: 'POST',
       headers: createHeaders(authToken),
       body: JSON.stringify(payload)
     })
+    if (response.status === 404) {
+      response = await fetch(`${endpoint}/pricing`, {
+        method: 'POST',
+        headers: createHeaders(authToken),
+        body: JSON.stringify(payload)
+      })
+    }
     if (!response.ok) {
       toast.error('Failed to update pricing')
       return false
@@ -356,10 +369,16 @@ export const getCostsAPI = async (
   authToken?: string
 ): Promise<CostBreakdownResponse | null> => {
   try {
-    const response = await fetch(APIRoutes.GetCosts(endpoint), {
+    let response = await fetch(APIRoutes.GetCosts(endpoint), {
       method: 'GET',
       headers: createHeaders(authToken)
     })
+    if (response.status === 404) {
+      response = await fetch(`${endpoint}/costs`, {
+        method: 'GET',
+        headers: createHeaders(authToken)
+      })
+    }
     if (!response.ok) return null
     return response.json()
   } catch {
@@ -372,10 +391,16 @@ export const getAvailableModelsAPI = async (
   authToken?: string
 ): Promise<AvailableModel[]> => {
   try {
-    const response = await fetch(APIRoutes.GetModels(endpoint), {
+    let response = await fetch(APIRoutes.GetModels(endpoint), {
       method: 'GET',
       headers: createHeaders(authToken)
     })
+    if (response.status === 404) {
+      response = await fetch(`${endpoint}/models`, {
+        method: 'GET',
+        headers: createHeaders(authToken)
+      })
+    }
     if (!response.ok) return []
     return response.json()
   } catch {
@@ -390,11 +415,18 @@ export const updateAgentModelAPI = async (
   authToken?: string
 ): Promise<boolean> => {
   try {
-    const response = await fetch(APIRoutes.UpdateAgentModel(endpoint, agentId), {
+    let response = await fetch(APIRoutes.UpdateAgentModel(endpoint, agentId), {
       method: 'POST',
       headers: createHeaders(authToken),
       body: JSON.stringify({ model_id: modelId })
     })
+    if (response.status === 404) {
+      response = await fetch(`${endpoint}/agents/${agentId}/model`, {
+        method: 'POST',
+        headers: createHeaders(authToken),
+        body: JSON.stringify({ model_id: modelId })
+      })
+    }
     if (!response.ok) {
       toast.error('Failed to update agent model')
       return false
