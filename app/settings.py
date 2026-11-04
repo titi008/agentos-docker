@@ -13,31 +13,60 @@ from agno.models.google import Gemini
 from agno.models.openai import OpenAIResponses
 
 
-def default_model() -> Any:
-    """Fresh model instance per agent — supports Anthropic, Gemini, or OpenAI."""
-    provider = getenv("MODEL_PROVIDER", "").lower()
-    if not provider:
-        if getenv("ANTHROPIC_API_KEY"):
-            provider = "anthropic"
-        elif getenv("GEMINI_API_KEY"):
-            provider = "gemini"
-        else:
-            provider = "openai"
+def _resolve_provider(tier_env_prefix: str = "") -> str:
+    """Resolve provider honoring tier override first, then global MODEL_PROVIDER, then detected API keys."""
+    if tier_env_prefix:
+        override = getenv(f"{tier_env_prefix}_PROVIDER", "").lower()
+        if override:
+            return override
 
+    provider = getenv("MODEL_PROVIDER", "").lower()
+    if provider:
+        return provider
+
+    if getenv("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if getenv("GEMINI_API_KEY"):
+        return "gemini"
+    return "openai"
+
+
+def reasoning_model() -> Any:
+    """Tier 1: Frontier reasoning model for Team Leaders, Planners, and Engineers."""
+    provider = _resolve_provider("REASONING")
     if provider == "anthropic":
-        model_id = getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+        model_id = getenv("ANTHROPIC_REASONING_MODEL", getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"))
         return Claude(id=model_id)
     if provider == "gemini":
-        model_id = getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        model_id = getenv("GEMINI_REASONING_MODEL", getenv("GEMINI_MODEL", "gemini-4-argon"))
         return Gemini(id=model_id)
 
-    model_id = getenv("OPENAI_MODEL", "gpt-6.1-sol")
+    model_id = getenv("OPENAI_REASONING_MODEL", getenv("OPENAI_MODEL", "gpt-6.1-sol"))
     return OpenAIResponses(id=model_id)
+
+
+def fast_model() -> Any:
+    """Tier 2: High-throughput, sub-second execution model for workers, scraping, and routine tool use."""
+    provider = _resolve_provider("FAST")
+    if provider == "gemini":
+        model_id = getenv("GEMINI_FAST_MODEL", "gemini-3.8-flash")
+        return Gemini(id=model_id)
+    if provider == "anthropic":
+        model_id = getenv("ANTHROPIC_FAST_MODEL", "claude-haiku-5-5")
+        return Claude(id=model_id)
+
+    model_id = getenv("OPENAI_FAST_MODEL", "gpt-6.1-sol")
+    return OpenAIResponses(id=model_id)
+
+
+def default_model() -> Any:
+    """Default fallback model instance per agent."""
+    return fast_model()
 
 
 def manager_model() -> Any:
     """Model for OS Manager and Company Product Manager."""
-    return default_model()
+    return reasoning_model()
 
 
 def get_available_models() -> list[Any]:

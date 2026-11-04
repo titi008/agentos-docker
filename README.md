@@ -281,6 +281,7 @@ See [AGENTS.md](AGENTS.md) for the code layout and development conventions.
 
 [example.env](example.env) shows the main settings. Start with `OPENAI_API_KEY`;
 add the others when you need them. Docker Compose reads `.env` for both local and production runs.
+For multi-model setups and cost-optimized routing, see [Model Tiering & Dynamic Orchestration](docs/models.md).
 
 | Setting | What it's for |
 | --- | --- |

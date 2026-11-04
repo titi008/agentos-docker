@@ -6,7 +6,7 @@ Content Strategist
 from agno.agent import Agent
 
 from app.registry import shared_learning, shared_notes
-from app.settings import default_model
+from app.settings import fast_model
 from db import get_postgres_db
 
 INSTRUCTIONS = """\
@@ -25,7 +25,7 @@ How you work:
 content_strategist = Agent(
     id="content-strategist",
     name="Content Strategist",
-    model=default_model(),
+    model=fast_model(),
     db=get_postgres_db(),
     learning=shared_learning,
     user_id="anonymous-user",

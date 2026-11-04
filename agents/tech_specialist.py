@@ -6,7 +6,7 @@ Tech Specialist
 from agno.agent import Agent
 
 from app.registry import shared_learning, shared_notes
-from app.settings import default_model
+from app.settings import reasoning_model
 from db import get_postgres_db
 
 INSTRUCTIONS = """\
@@ -25,7 +25,7 @@ How you work:
 tech_specialist = Agent(
     id="tech-specialist",
     name="Tech Specialist",
-    model=default_model(),
+    model=reasoning_model(),
     db=get_postgres_db(),
     learning=shared_learning,
     user_id="anonymous-user",

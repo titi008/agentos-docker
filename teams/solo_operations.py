@@ -9,7 +9,7 @@ from agents.copywriter import content_strategist
 from agents.researcher import market_researcher
 from agents.tech_specialist import tech_specialist
 from app.registry import shared_learning
-from app.settings import manager_model
+from app.settings import reasoning_model
 from db import get_postgres_db
 
 INSTRUCTIONS = """\
@@ -30,7 +30,7 @@ How you work:
 solo_operations_team = Team(
     id="solo-chief-of-staff",
     name="Solo Chief of Staff",
-    model=manager_model(),
+    model=reasoning_model(),
     members=[market_researcher, content_strategist, tech_specialist],
     db=get_postgres_db(),
     learning=shared_learning,

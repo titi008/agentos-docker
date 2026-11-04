@@ -6,7 +6,7 @@ Market Researcher
 from agno.agent import Agent
 
 from app.registry import get_web_tools, shared_learning
-from app.settings import default_model
+from app.settings import fast_model
 from db import get_postgres_db
 
 INSTRUCTIONS = """\
@@ -25,7 +25,7 @@ How you work:
 market_researcher = Agent(
     id="market-researcher",
     name="Market Researcher",
-    model=default_model(),
+    model=fast_model(),
     db=get_postgres_db(),
     learning=shared_learning,
     user_id="anonymous-user",
