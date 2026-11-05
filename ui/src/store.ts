@@ -24,8 +24,20 @@ interface Store {
   setHydrated: () => void
 
   /* Connection (persisted) */
+  /** The AgentOS host every request goes to. */
   selectedEndpoint: string
-  setSelectedEndpoint: (selectedEndpoint: string) => void
+  /** True once the operator saved a host; until then the deployment default is used. */
+  endpointIsCustom: boolean
+  /** Host from the deployment's NEXT_PUBLIC_API_URL, loaded at startup (not persisted). */
+  serverDefaultEndpoint: string | null
+  /** False until the host is known: a saved one, or the deployment default has loaded. */
+  endpointResolved: boolean
+  /** Apply the deployment default; keeps a host the operator saved. */
+  applyServerDefaultEndpoint: (endpoint: string | null) => void
+  /** Save a host chosen in Settings. */
+  saveEndpoint: (endpoint: string) => void
+  /** Go back to the deployment default (or localhost when there is none). */
+  resetEndpoint: () => void
   authToken: string
   setAuthToken: (authToken: string) => void
   userId: string
@@ -78,14 +90,56 @@ interface Store {
 
 export const DEFAULT_ENDPOINT = 'http://localhost:7777'
 
+const trimEndpoint = (endpoint: string) => endpoint.trim().replace(/\/+$/, '')
+
+type PersistedState = Pick<
+  Store,
+  | 'selectedEndpoint'
+  | 'endpointIsCustom'
+  | 'userId'
+  | 'authToken'
+  | 'sidebarCollapsed'
+>
+
 export const useStore = create<Store>()(
   persist(
     (set) => ({
       hydrated: false,
-      setHydrated: () => set({ hydrated: true }),
+      // A saved host is known as soon as storage is restored; the default waits for /api/config.
+      setHydrated: () =>
+        set((state) => ({
+          hydrated: true,
+          endpointResolved: state.endpointResolved || state.endpointIsCustom
+        })),
 
       selectedEndpoint: DEFAULT_ENDPOINT,
-      setSelectedEndpoint: (selectedEndpoint) => set({ selectedEndpoint }),
+      endpointIsCustom: false,
+      serverDefaultEndpoint: null,
+      endpointResolved: false,
+      applyServerDefaultEndpoint: (endpoint) =>
+        set((state) => ({
+          serverDefaultEndpoint: endpoint,
+          endpointResolved: true,
+          ...(state.endpointIsCustom
+            ? {}
+            : { selectedEndpoint: endpoint ?? DEFAULT_ENDPOINT })
+        })),
+      saveEndpoint: (endpoint) =>
+        set((state) => {
+          const selectedEndpoint = trimEndpoint(endpoint)
+          const fallback = state.serverDefaultEndpoint ?? DEFAULT_ENDPOINT
+          return {
+            selectedEndpoint,
+            endpointIsCustom: selectedEndpoint !== trimEndpoint(fallback),
+            endpointResolved: true
+          }
+        }),
+      resetEndpoint: () =>
+        set((state) => ({
+          selectedEndpoint: state.serverDefaultEndpoint ?? DEFAULT_ENDPOINT,
+          endpointIsCustom: false,
+          endpointResolved: true
+        })),
       authToken: '',
       setAuthToken: (authToken) => set({ authToken }),
       userId: 'default',
@@ -137,13 +191,30 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'endpoint-storage',
+      version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
+      partialize: (state): PersistedState => ({
         selectedEndpoint: state.selectedEndpoint,
+        endpointIsCustom: state.endpointIsCustom,
         userId: state.userId,
         authToken: state.authToken,
         sidebarCollapsed: state.sidebarCollapsed
       }),
+      // v0 stored the host without knowing whether the operator chose it:
+      // anything other than the old built-in default counts as their choice.
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Partial<PersistedState>
+        if (version < 1) {
+          const stored =
+            typeof state.selectedEndpoint === 'string'
+              ? trimEndpoint(state.selectedEndpoint)
+              : ''
+          state.endpointIsCustom =
+            Boolean(stored) && stored !== DEFAULT_ENDPOINT
+        }
+        return state as PersistedState
+      },
+      // Runs while the store is still being created, so only use the state's own actions here.
       onRehydrateStorage: () => (state) => {
         state?.setHydrated?.()
       }

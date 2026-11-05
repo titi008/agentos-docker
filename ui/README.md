@@ -27,6 +27,16 @@ pnpm dev
 Open http://localhost:3000. The UI connects to `http://localhost:7777` by default;
 change the host and auth token under **Settings**.
 
+### Default AgentOS host
+
+Set `NEXT_PUBLIC_API_URL` (for example `https://agentos.example.com`) on the UI
+server to choose the host every browser starts with. It is read at request time by
+`/api/config`, so it works for a prebuilt image: set it on the running container,
+no rebuild needed. `compose.coolify.yaml` passes `AGENTOS_URL` through it. A host an
+operator saves in Settings takes precedence for that browser; **Use default** in
+Settings returns to the deployment's host. Unset or invalid values fall back to
+`http://localhost:7777`.
+
 ### Authentication
 
 - **Auth token**: entered in Settings and stored in the browser's local storage,

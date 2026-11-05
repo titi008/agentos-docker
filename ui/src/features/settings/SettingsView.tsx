@@ -16,7 +16,7 @@ import { PageBody, PageHeader, PageScroll } from '@/components/ui/page'
 import { SegmentedControl } from '@/components/ui/segmented'
 import { useIdentityQuery } from '@/features/workspace/queries'
 import { isValidUrl } from '@/lib/utils'
-import { useStore } from '@/store'
+import { DEFAULT_ENDPOINT, useStore } from '@/store'
 
 import packageJson from '../../../package.json'
 
@@ -49,7 +49,10 @@ type TestState =
 function ConnectionSection() {
   const router = useRouter()
   const endpoint = useStore((state) => state.selectedEndpoint)
-  const setEndpoint = useStore((state) => state.setSelectedEndpoint)
+  const endpointIsCustom = useStore((state) => state.endpointIsCustom)
+  const serverDefault = useStore((state) => state.serverDefaultEndpoint)
+  const saveEndpoint = useStore((state) => state.saveEndpoint)
+  const resetEndpoint = useStore((state) => state.resetEndpoint)
   const authToken = useStore((state) => state.authToken)
   const active = useStore((state) => state.isEndpointActive)
   const loading = useStore((state) => state.isEndpointLoading)
@@ -85,6 +88,16 @@ function ConnectionSection() {
     }
   }
 
+  /** Clears state that belongs to the previous host. */
+  const switchHost = (message: string) => {
+    setMessages([])
+    setSessionsData(null)
+    setSelectedModel('')
+    setTest({ status: 'idle' })
+    router.replace('/settings')
+    toast.success(message)
+  }
+
   const save = () => {
     const value = validate()
     if (!value) return
@@ -92,14 +105,19 @@ function ConnectionSection() {
       toast.success('Host unchanged')
       return
     }
-    setEndpoint(value)
-    setMessages([])
-    setSessionsData(null)
-    setSelectedModel('')
-    setTest({ status: 'idle' })
-    router.replace('/settings')
-    toast.success('Host saved. Reloading agents, teams and workflows.')
+    saveEndpoint(value)
+    switchHost('Host saved. Reloading agents, teams and workflows.')
   }
+
+  const switchToDefault = () => {
+    resetEndpoint()
+    switchHost('Using the default host. Reloading agents, teams and workflows.')
+  }
+
+  const defaultHost = serverDefault ?? DEFAULT_ENDPOINT
+  const usingDefault =
+    !endpointIsCustom ||
+    normalizeEndpoint(endpoint) === normalizeEndpoint(defaultHost)
 
   const status = loading ? 'Connecting' : active ? 'Connected' : 'Offline'
 
@@ -127,7 +145,19 @@ function ConnectionSection() {
           }
           htmlFor="endpoint"
           error={error}
-          help="Changing the host clears the open chat and reloads agents, teams and workflows."
+          help={
+            <>
+              {serverDefault ? (
+                <>
+                  Default for this deployment:{' '}
+                  <span className="font-mono">{serverDefault}</span> (from
+                  NEXT_PUBLIC_API_URL).{' '}
+                </>
+              ) : null}
+              Changing the host clears the open chat and reloads agents, teams
+              and workflows.
+            </>
+          }
         >
           <Input
             id="endpoint"
@@ -160,6 +190,11 @@ function ConnectionSection() {
           <Button type="submit" variant="primary">
             Save
           </Button>
+          {usingDefault ? null : (
+            <Button variant="ghost" onClick={switchToDefault}>
+              Use default ({defaultHost})
+            </Button>
+          )}
         </div>
       </form>
     </Section>

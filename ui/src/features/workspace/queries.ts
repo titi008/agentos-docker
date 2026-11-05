@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { unwrapList, useApi } from '@/api/client'
+import type { RuntimeConfigResponse } from '@/app/api/config/route'
 import { useStore } from '@/store'
 import type {
   AgentDetails,
@@ -104,12 +105,29 @@ export function useIdentityQuery() {
   })
 }
 
+/** This deployment's settings, read by the UI server at request time. */
+export function useRuntimeConfigQuery() {
+  return useQuery({
+    queryKey: ['runtime-config'],
+    queryFn: async ({ signal }) => {
+      const response = await fetch('/api/config', { signal })
+      if (!response.ok)
+        throw new Error(`Config lookup failed (${response.status})`)
+      return (await response.json()) as RuntimeConfigResponse
+    },
+    staleTime: Infinity,
+    retry: 1
+  })
+}
+
 /**
- * Loads connection status, agents, teams, workflows, the approvals count and
+ * Resolves the AgentOS host (a saved one, else the deployment default), then
+ * loads connection status, agents, teams, workflows, the approvals count and
  * the operator identity, and mirrors them into the store for the chat code.
  * Mounted once by the app shell.
  */
 export function useWorkspaceBootstrap() {
+  const runtimeConfig = useRuntimeConfigQuery()
   const health = useHealthQuery()
   const agents = useAgentsQuery()
   const teams = useTeamsQuery()
@@ -129,6 +147,25 @@ export function useWorkspaceBootstrap() {
   const setUserId = useStore((state) => state.setUserId)
   const authToken = useStore((state) => state.authToken)
   const setAuthToken = useStore((state) => state.setAuthToken)
+  const applyServerDefaultEndpoint = useStore(
+    (state) => state.applyServerDefaultEndpoint
+  )
+
+  // Requests wait until the host is known; without a config the stored or built-in host is used.
+  useEffect(() => {
+    if (!hydrated) return
+    if (runtimeConfig.isSuccess) {
+      applyServerDefaultEndpoint(runtimeConfig.data.default_endpoint)
+    } else if (runtimeConfig.isError) {
+      applyServerDefaultEndpoint(null)
+    }
+  }, [
+    hydrated,
+    runtimeConfig.isSuccess,
+    runtimeConfig.isError,
+    runtimeConfig.data,
+    applyServerDefaultEndpoint
+  ])
 
   // A build-time token seeds the connection when none is stored yet.
   useEffect(() => {

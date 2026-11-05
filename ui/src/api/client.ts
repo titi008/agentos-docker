@@ -201,6 +201,7 @@ export function getErrorMessage(error: unknown, endpoint?: string): string {
  */
 export function useApi() {
   const hydrated = useStore((state) => state.hydrated)
+  const endpointResolved = useStore((state) => state.endpointResolved)
   const endpoint = useStore((state) => state.selectedEndpoint)
   const authToken = useStore((state) => state.authToken)
   const userId = useStore((state) => state.userId)
@@ -223,7 +224,8 @@ export function useApi() {
 
   return {
     ctx,
-    ready: hydrated && Boolean(ctx.endpoint),
+    // Wait for the host (saved, or the deployment default) so nothing is sent to a placeholder.
+    ready: hydrated && endpointResolved && Boolean(ctx.endpoint),
     request,
     key
   }
