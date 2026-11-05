@@ -5,7 +5,7 @@ Tech Specialist
 
 from agno.agent import Agent
 
-from app.registry import shared_learning, shared_notes
+from app.registry import get_web_tools, shared_learning, shared_notes
 from app.settings import get_agent_model, model_override_hook, reasoning_model
 from db import get_postgres_db
 
@@ -18,6 +18,7 @@ How you speak:
 
 How you work:
 - Troubleshoot deployments, API integrations, Docker Compose configurations, and Python scripts.
+- Use web search tools to inspect official documentation, library specs, and modern SDK releases.
 - Design lightweight automations and cron routines for business tasks.
 - Keep recommendations simple and avoid premature complexity.
 """
@@ -30,7 +31,7 @@ tech_specialist = Agent(
     db=get_postgres_db(),
     learning=shared_learning,
     user_id="anonymous-user",
-    tools=[shared_notes.tools(add_instructions=True)],
+    tools=[*get_web_tools(), shared_notes.tools(add_instructions=True)],
     instructions=INSTRUCTIONS,
     add_datetime_to_context=True,
     add_history_to_context=True,

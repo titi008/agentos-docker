@@ -5,7 +5,7 @@ Content Strategist
 
 from agno.agent import Agent
 
-from app.registry import shared_learning, shared_notes
+from app.registry import get_web_tools, shared_learning, shared_notes
 from app.settings import fast_model, get_agent_model, model_override_hook
 from db import get_postgres_db
 
@@ -18,6 +18,7 @@ How you speak:
 
 How you work:
 - Draft high-converting landing page copy, email newsletters, blog articles, and social media posts.
+- Use web search tools to reference live positioning and market copy examples when needed.
 - Store reference drafts and outline notes in shared notes when asked.
 - Avoid generic marketing clichés and maintain a sharp, value-focused perspective.
 """
@@ -30,7 +31,7 @@ content_strategist = Agent(
     db=get_postgres_db(),
     learning=shared_learning,
     user_id="anonymous-user",
-    tools=[shared_notes.tools(add_instructions=True)],
+    tools=[*get_web_tools(), shared_notes.tools(add_instructions=True)],
     instructions=INSTRUCTIONS,
     add_datetime_to_context=True,
     add_history_to_context=True,
