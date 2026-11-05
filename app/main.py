@@ -12,8 +12,9 @@ from agno.job_queue import QueueConfig
 from agno.os import AgentOS, CompanyConfig, OSManager
 from agno.os.config import CORSConfig
 from agno.team import Team
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
 
 from agents.copywriter import content_strategist
 from agents.researcher import market_researcher
@@ -156,9 +157,18 @@ async def update_pricing(payload: UpdatePriceRequest) -> dict:
 
 @base_app.get("/costs")
 @base_app.get("/api/costs")
-async def get_costs() -> dict:
-    """Return aggregated token and cost breakdown per model, provider, and day."""
-    return compute_cost_breakdown()
+def get_costs() -> dict:
+    """Return aggregated token and cost breakdown per model, provider, and day.
+
+    Sync on purpose: the database read runs in FastAPI's threadpool instead of
+    blocking the event loop.
+    """
+    try:
+        return compute_cost_breakdown()
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503, detail="Cost data is unavailable: the database could not be read."
+        ) from exc
 
 
 agent_os = AgentOS(

@@ -8,12 +8,17 @@ and computes historical and real-time usage costs.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import text
+from agno.db.postgres import PostgresDb
+from agno.utils.log import log_error
+from sqlalchemy import case, cast, column, exists, func, inspect, select, table
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.exc import SQLAlchemyError
 
 from db import get_postgres_db
 
@@ -222,167 +227,225 @@ class PricingManager:
 pricing_manager = PricingManager()
 
 
-def compute_cost_breakdown() -> dict[str, Any]:
-    """Query PostgreSQL run and metrics data to compute token and cost breakdown per model and provider."""
-    current_rates = {r.model_id: r for r in pricing_manager.get_current_rates()}
+# ---------------------------------------------------------------------------
+# Cost breakdown
+# ---------------------------------------------------------------------------
 
-    # Structure for aggregation
+UNKNOWN_MODEL = "unknown-model"
+
+
+@dataclass(frozen=True)
+class RunUsageRow:
+    """One stored run, reduced to the fields cost accounting reads."""
+
+    model: str | None
+    model_provider: str | None
+    metrics: Any
+    created_at: Any
+    parent_run_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ModelUsage:
+    """Tokens one run spent on one model."""
+
+    model_id: str
+    provider: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+def _non_negative_int(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except TypeError, ValueError:
+        return 0
+
+
+def _token_counts(metrics: Mapping[str, Any]) -> tuple[int, int, int]:
+    input_tokens = _non_negative_int(metrics.get("input_tokens") or metrics.get("prompt_tokens"))
+    output_tokens = _non_negative_int(metrics.get("output_tokens") or metrics.get("completion_tokens"))
+    total_tokens = _non_negative_int(metrics.get("total_tokens")) or input_tokens + output_tokens
+    return input_tokens, output_tokens, total_tokens
+
+
+def _normalize_provider(model_id: str, provider: str | None) -> str:
+    """Use the recorded provider, or infer the common ones from the model id."""
+    if provider and provider.strip() and provider.strip().lower() != "unknown":
+        return provider.strip()
+    lowered = model_id.lower()
+    if "claude" in lowered:
+        return "Anthropic"
+    if "gemini" in lowered:
+        return "Google"
+    if lowered.startswith(("gpt", "o1", "o3", "o4")):
+        return "OpenAI"
+    return "Unknown"
+
+
+def _usage_from_run_metrics(
+    metrics: Mapping[str, Any], fallback_model: str | None, fallback_provider: str | None
+) -> list[ModelUsage]:
+    """Per-model usage of one agno RunMetrics dict.
+
+    ``details`` lists every model the run called (main, output, memory, reasoning
+    models…), so it is preferred over the run totals, which mix those models.
+    """
+    usage: list[ModelUsage] = []
+    details = metrics.get("details")
+    if isinstance(details, Mapping):
+        for entries in details.values():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, Mapping):
+                    continue
+                input_tokens, output_tokens, total_tokens = _token_counts(entry)
+                if not total_tokens:
+                    continue
+                model_id = str(entry.get("id") or fallback_model or UNKNOWN_MODEL)
+                usage.append(
+                    ModelUsage(
+                        model_id=model_id,
+                        provider=_normalize_provider(model_id, entry.get("provider") or fallback_provider),
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        total_tokens=total_tokens,
+                    )
+                )
+    if usage:
+        return usage
+
+    input_tokens, output_tokens, total_tokens = _token_counts(metrics)
+    if not total_tokens:
+        return []
+    model_id = fallback_model or UNKNOWN_MODEL
+    return [
+        ModelUsage(
+            model_id=model_id,
+            provider=_normalize_provider(model_id, fallback_provider),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
+    ]
+
+
+def run_model_usage(row: RunUsageRow) -> list[ModelUsage]:
+    """Tokens a stored run spent, per model.
+
+    Agent and team runs carry RunMetrics. Team member runs are stored as their
+    own rows (with ``parent_run_id``) and the leader's metrics exclude them, so
+    every row is counted once. Workflow runs keep usage per step.
+    """
+    metrics = row.metrics
+    if isinstance(metrics, str):
+        try:
+            metrics = json.loads(metrics)
+        except ValueError:
+            return []
+    if not isinstance(metrics, Mapping):
+        return []
+
+    steps = metrics.get("steps")
+    if isinstance(steps, Mapping):
+        usage: list[ModelUsage] = []
+        for step in steps.values():
+            step_metrics = step.get("metrics") if isinstance(step, Mapping) else None
+            if isinstance(step_metrics, Mapping):
+                usage.extend(_usage_from_run_metrics(step_metrics, None, None))
+        return usage
+
+    return _usage_from_run_metrics(metrics, row.model, row.model_provider)
+
+
+def _run_timestamp(value: Any) -> datetime | None:
+    """Stored runs use unix seconds; legacy rows may hold them as strings."""
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    try:
+        seconds = float(value)
+    except TypeError, ValueError:
+        return None
+    if seconds > 1e12:  # milliseconds
+        seconds /= 1000
+    try:
+        return datetime.fromtimestamp(seconds, tz=UTC)
+    except OverflowError, OSError, ValueError:
+        return None
+
+
+def _empty_stat(**keys: str) -> dict[str, Any]:
+    return {**keys, "runs": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "total_cost": 0.0}
+
+
+def _add_usage(stat: dict[str, Any], usage: ModelUsage, cost: float) -> None:
+    stat["input_tokens"] += usage.input_tokens
+    stat["output_tokens"] += usage.output_tokens
+    stat["total_tokens"] += usage.total_tokens
+    stat["total_cost"] = round(stat["total_cost"] + cost, 6)
+
+
+def aggregate_costs(rows: Iterable[RunUsageRow], manager: PricingManager) -> dict[str, Any]:
+    """Aggregate token usage and estimated cost per model, provider and UTC day.
+
+    Each model's cost uses the rate that was effective when the run happened.
+    ``runs`` counts top-level runs (team member runs belong to their team run);
+    per-model and per-provider ``runs`` count every run that used them.
+    """
+    current_rates = {rate.model_id: rate for rate in manager.get_current_rates()}
     model_stats: dict[str, dict[str, Any]] = {}
     provider_stats: dict[str, dict[str, Any]] = {}
     daily_stats: dict[str, dict[str, Any]] = {}
-
     total_runs = 0
     total_input_tokens = 0
     total_output_tokens = 0
     total_cost = 0.0
 
-    # Query PostgreSQL runs table if reachable
-    try:
-        db = get_postgres_db()
-        engine = getattr(db, "db_engine", getattr(db, "_engine", None))
-        if engine is not None:
-            with engine.connect() as conn:
-                # Query distinct run data from agno_runs
-                table_name = getattr(db, "runs_table_name", "agno_runs")
-                query = text(f"""
-                    SELECT 
-                        agent_id, team_id, run_data, created_at
-                    FROM {table_name}
-                    ORDER BY created_at ASC
-                """)
-                rows = conn.execute(query).fetchall()
+    for row in rows:
+        timestamp = _run_timestamp(row.created_at)
+        timestamp_iso = timestamp.isoformat() if timestamp else None
+        day = timestamp.strftime("%Y-%m-%d") if timestamp else None
+        is_top_level = not row.parent_run_id
+        daily = daily_stats.setdefault(day, _empty_stat(date=day)) if day else None
 
-                for row in rows:
-                    raw_data = row[2]
-                    if isinstance(raw_data, dict):
-                        run_data = raw_data
-                    elif isinstance(raw_data, str):
-                        try:
-                            run_data = json.loads(raw_data)
-                        except Exception:
-                            run_data = {}
-                    else:
-                        run_data = {}
+        if is_top_level:
+            total_runs += 1
+            if daily is not None:
+                daily["runs"] += 1
 
-                    created_at_val = row[3]
+        models_seen: set[str] = set()
+        providers_seen: set[str] = set()
+        for usage in run_model_usage(row):
+            cost = manager.calculate_cost(usage.model_id, usage.input_tokens, usage.output_tokens, timestamp_iso)
+            total_input_tokens += usage.input_tokens
+            total_output_tokens += usage.output_tokens
+            total_cost += cost
 
-                    # Parse timestamp
-                    ts_iso: str | None = None
-                    if isinstance(created_at_val, (int, float)):
-                        ts_iso = datetime.fromtimestamp(created_at_val, tz=UTC).isoformat()
-                    elif isinstance(created_at_val, datetime):
-                        ts_iso = created_at_val.isoformat()
+            model_stat = model_stats.setdefault(
+                usage.model_id, _empty_stat(model_id=usage.model_id, provider=usage.provider)
+            )
+            provider_stat = provider_stats.setdefault(usage.provider, _empty_stat(provider=usage.provider))
+            if usage.model_id not in models_seen:
+                model_stat["runs"] += 1
+                models_seen.add(usage.model_id)
+            if usage.provider not in providers_seen:
+                provider_stat["runs"] += 1
+                providers_seen.add(usage.provider)
+            _add_usage(model_stat, usage, cost)
+            _add_usage(provider_stat, usage, cost)
+            if daily is not None:
+                _add_usage(daily, usage, cost)
 
-                    date_str = ts_iso[:10] if ts_iso else datetime.now(UTC).strftime("%Y-%m-%d")
-
-                    model = str(run_data.get("model") or "unknown-model")
-                    provider = str(run_data.get("model_provider") or "Unknown")
-
-                    # Normalize provider if unknown
-                    if provider == "Unknown":
-                        if "claude" in model.lower():
-                            provider = "Anthropic"
-                        elif "gemini" in model.lower():
-                            provider = "Google"
-                        elif "gpt" in model.lower():
-                            provider = "OpenAI"
-
-                    metrics = run_data.get("metrics") or {}
-                    in_tok = int(metrics.get("input_tokens") or metrics.get("prompt_tokens") or 0)
-                    out_tok = int(metrics.get("output_tokens") or metrics.get("completion_tokens") or 0)
-                    tot_tok = int(metrics.get("total_tokens") or (in_tok + out_tok))
-
-                    run_cost = pricing_manager.calculate_cost(model, in_tok, out_tok, ts_iso)
-
-                    total_runs += 1
-                    total_input_tokens += in_tok
-                    total_output_tokens += out_tok
-                    total_cost += run_cost
-
-                    # Model stats
-                    m_stat = model_stats.setdefault(
-                        model,
-                        {
-                            "model_id": model,
-                            "provider": provider,
-                            "runs": 0,
-                            "input_tokens": 0,
-                            "output_tokens": 0,
-                            "total_tokens": 0,
-                            "total_cost": 0.0,
-                        },
-                    )
-                    m_stat["runs"] += 1
-                    m_stat["input_tokens"] += in_tok
-                    m_stat["output_tokens"] += out_tok
-                    m_stat["total_tokens"] += tot_tok
-                    m_stat["total_cost"] = round(m_stat["total_cost"] + run_cost, 6)
-
-                    # Provider stats
-                    p_stat = provider_stats.setdefault(
-                        provider,
-                        {
-                            "provider": provider,
-                            "runs": 0,
-                            "input_tokens": 0,
-                            "output_tokens": 0,
-                            "total_tokens": 0,
-                            "total_cost": 0.0,
-                        },
-                    )
-                    p_stat["runs"] += 1
-                    p_stat["input_tokens"] += in_tok
-                    p_stat["output_tokens"] += out_tok
-                    p_stat["total_tokens"] += tot_tok
-                    p_stat["total_cost"] = round(p_stat["total_cost"] + run_cost, 6)
-
-                    # Daily stats
-                    d_stat = daily_stats.setdefault(
-                        date_str,
-                        {
-                            "date": date_str,
-                            "runs": 0,
-                            "input_tokens": 0,
-                            "output_tokens": 0,
-                            "total_tokens": 0,
-                            "total_cost": 0.0,
-                        },
-                    )
-                    d_stat["runs"] += 1
-                    d_stat["input_tokens"] += in_tok
-                    d_stat["output_tokens"] += out_tok
-                    d_stat["total_tokens"] += tot_tok
-                    d_stat["total_cost"] = round(d_stat["total_cost"] + run_cost, 6)
-    except Exception:
-        # Gracefully handle database offline or missing tables
-        pass
-
-    # Ensure catalog models are listed even with 0 runs
+    # Priced models are listed even before their first run.
     for model_id, rate in current_rates.items():
-        if model_id not in model_stats:
-            model_stats[model_id] = {
-                "model_id": model_id,
-                "provider": rate.provider,
-                "runs": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-                "total_cost": 0.0,
-            }
-        if rate.provider not in provider_stats:
-            provider_stats[rate.provider] = {
-                "provider": rate.provider,
-                "runs": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-                "total_cost": 0.0,
-            }
+        model_stats.setdefault(model_id, _empty_stat(model_id=model_id, provider=rate.provider))
+        provider_stats.setdefault(rate.provider, _empty_stat(provider=rate.provider))
 
-    # Format provider list with percentage
-    providers_list = list(provider_stats.values())
-    for p in providers_list:
-        p["percentage"] = round((p["total_cost"] / total_cost * 100), 1) if total_cost > 0 else 0.0
+    providers = list(provider_stats.values())
+    for provider in providers:
+        provider["percentage"] = round(provider["total_cost"] / total_cost * 100, 1) if total_cost > 0 else 0.0
 
     return {
         "total_cost": round(total_cost, 4),
@@ -390,8 +453,84 @@ def compute_cost_breakdown() -> dict[str, Any]:
         "total_tokens": total_input_tokens + total_output_tokens,
         "total_input_tokens": total_input_tokens,
         "total_output_tokens": total_output_tokens,
-        "by_provider": sorted(providers_list, key=lambda x: x["total_cost"], reverse=True),
-        "by_model": sorted(list(model_stats.values()), key=lambda x: (x["runs"], x["total_cost"]), reverse=True),
-        "daily_history": [daily_stats[k] for k in sorted(daily_stats.keys(), reverse=True)],
-        "rates": [r.to_dict() for r in current_rates.values()],
+        "by_provider": sorted(providers, key=lambda item: item["total_cost"], reverse=True),
+        "by_model": sorted(model_stats.values(), key=lambda item: (item["runs"], item["total_cost"]), reverse=True),
+        "daily_history": [daily_stats[key] for key in sorted(daily_stats, reverse=True)],
+        "rates": [rate.to_dict() for rate in current_rates.values()],
     }
+
+
+def load_run_usage(db: PostgresDb) -> list[RunUsageRow]:
+    """Read model, provider, metrics and time of every stored run.
+
+    Runs live in the db's runs table (``ai.agno_runs`` by default). Sessions not
+    yet migrated from agno 2.x still hold runs in the legacy ``runs`` column of
+    the sessions table; those are read too, the same way agno's metrics do.
+    Only these fields are selected, never whole runs. A database without the
+    tables yet has no runs.
+    """
+    schema = db.db_schema
+    runs_table_name = db.runs_table_name
+    sessions_table_name = db.session_table_name
+    rows: list[RunUsageRow] = []
+
+    with db.db_engine.connect() as conn:
+        inspector = inspect(conn)
+        has_runs = inspector.has_table(runs_table_name, schema=schema)
+        runs = table(
+            runs_table_name,
+            column("session_id"),
+            column("run_data", JSONB),
+            column("parent_run_id"),
+            column("created_at"),
+            schema=schema,
+        )
+        if has_runs:
+            stmt = select(
+                runs.c.run_data["model"].astext,
+                runs.c.run_data["model_provider"].astext,
+                runs.c.run_data["metrics"],
+                runs.c.created_at,
+                runs.c.parent_run_id,
+            ).order_by(runs.c.created_at)
+            rows.extend(RunUsageRow(*record) for record in conn.execute(stmt))
+
+        has_legacy_runs = inspector.has_table(sessions_table_name, schema=schema) and any(
+            col["name"] == "runs" for col in inspector.get_columns(sessions_table_name, schema=schema)
+        )
+        if has_legacy_runs:
+            sessions = table(sessions_table_name, column("session_id"), column("runs"), schema=schema)
+            legacy_runs = cast(sessions.c.runs, JSONB)
+            legacy_run = func.jsonb_array_elements(
+                case((func.jsonb_typeof(legacy_runs) == "array", legacy_runs), else_=func.jsonb_build_array()),
+                type_=JSONB,
+            ).column_valued("legacy_run", joins_implicitly=True)
+            legacy_stmt = select(
+                legacy_run["model"].astext,
+                legacy_run["model_provider"].astext,
+                legacy_run["metrics"],
+                legacy_run["created_at"].astext,
+                legacy_run["parent_run_id"].astext,
+            ).select_from(sessions)
+            if has_runs:
+                # Sessions that already have rows in the runs table were migrated.
+                legacy_stmt = legacy_stmt.where(
+                    ~exists(select(runs.c.session_id).where(runs.c.session_id == sessions.c.session_id))
+                )
+            rows.extend(RunUsageRow(*record) for record in conn.execute(legacy_stmt))
+
+    return rows
+
+
+def compute_cost_breakdown() -> dict[str, Any]:
+    """Token and estimated cost breakdown per model, provider and day.
+
+    Raises SQLAlchemyError when the database can't be read, so callers can
+    report an outage instead of showing zero spend.
+    """
+    try:
+        rows = load_run_usage(get_postgres_db())
+    except SQLAlchemyError as exc:
+        log_error(f"Could not read runs for the cost breakdown: {exc}")
+        raise
+    return aggregate_costs(rows, pricing_manager)
