@@ -71,7 +71,9 @@ export const APIRoutes = {
 
   // Company Tasks
   GetCompanyProducts: (agentOSUrl: string) => `${agentOSUrl}/company/products`,
+  CreateCompanyProduct: (agentOSUrl: string) => `${agentOSUrl}/company/products`,
   GetCompanyProjects: (agentOSUrl: string) => `${agentOSUrl}/company/projects`,
+  CreateCompanyProject: (agentOSUrl: string) => `${agentOSUrl}/company/projects`,
   GetCompanyTasks: (agentOSUrl: string) => `${agentOSUrl}/company/tasks`,
   CreateCompanyTask: (agentOSUrl: string) => `${agentOSUrl}/company/tasks`,
   TransitionCompanyTask: (agentOSUrl: string, taskId: string) =>

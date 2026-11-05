@@ -100,6 +100,53 @@ class TestEndpoints(unittest.TestCase):
         res_alias = self.client.get("/costs")
         self.assertEqual(res_alias.status_code, 200)
 
+    def test_company_product_project_task_flow(self) -> None:
+        import uuid
+
+        test_suffix = uuid.uuid4().hex[:6]
+        prod_name = f"Test Product {test_suffix}"
+
+        # 1. Create Product
+        res_prod = self.client.post(
+            "/company/products",
+            json={"name": prod_name, "purpose": "Testing product & team association"},
+        )
+        self.assertEqual(res_prod.status_code, 201)
+        prod_data = res_prod.json()
+        prod_id = prod_data["id"]
+        self.assertEqual(prod_data["name"], prod_name)
+
+        # 2. Create Project under Product
+        proj_name = f"Test Project {test_suffix}"
+        res_proj = self.client.post(
+            "/company/projects",
+            json={"product_id": prod_id, "name": proj_name, "outcome": "Deliver test artifact"},
+        )
+        self.assertEqual(res_proj.status_code, 201)
+        proj_data = res_proj.json()
+        proj_id = proj_data["id"]
+        self.assertEqual(proj_data["product_id"], prod_id)
+
+        # 3. Create Task with Team assignment
+        res_task = self.client.post(
+            "/company/tasks",
+            json={
+                "product_id": prod_id,
+                "project_id": proj_id,
+                "title": f"Execute team task {test_suffix}",
+                "brief": "Delegate this task to solo operations team",
+                "executor_type": "team",
+                "executor_id": "solo-chief-of-staff",
+                "status": "backlog",
+            },
+        )
+        self.assertEqual(res_task.status_code, 201)
+        task_data = res_task.json()
+        self.assertEqual(task_data["executor_type"], "team")
+        self.assertEqual(task_data["executor_id"], "solo-chief-of-staff")
+        self.assertEqual(task_data["project_id"], proj_id)
+        self.assertEqual(task_data["product_id"], prod_id)
+
 
 if __name__ == "__main__":
     unittest.main()

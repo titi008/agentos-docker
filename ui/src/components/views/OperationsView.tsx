@@ -15,10 +15,14 @@ import {
   requeueJobAPI,
   getQueueStatsAPI,
   getCompanyProductsAPI,
+  createCompanyProductAPI,
   getCompanyProjectsAPI,
+  createCompanyProjectAPI,
   getCompanyTasksAPI,
   createCompanyTaskAPI,
-  transitionCompanyTaskAPI
+  transitionCompanyTaskAPI,
+  getTeamsAPI,
+  getAgentsAPI
 } from '@/api/os'
 import {
   ApprovalResponse,
@@ -27,7 +31,9 @@ import {
   QueueJobSchema,
   CompanyProduct,
   CompanyProject,
-  CompanyTask
+  CompanyTask,
+  TeamDetails,
+  AgentDetails
 } from '@/types/os'
 import {
   ShieldCheck,
@@ -42,7 +48,13 @@ import {
   CheckCircle2,
   XCircle,
   X,
-  Check
+  Check,
+  Users,
+  User,
+  Folder,
+  FolderPlus,
+  Package,
+  PackagePlus
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -80,13 +92,31 @@ export const OperationsView = () => {
   const [products, setProducts] = useState<CompanyProduct[]>([])
   const [projects, setProjects] = useState<CompanyProject[]>([])
   const [tasks, setTasks] = useState<CompanyTask[]>([])
+  const [availableTeams, setAvailableTeams] = useState<TeamDetails[]>([])
+  const [availableAgents, setAvailableAgents] = useState<AgentDetails[]>([])
   const [isTasksLoading, setIsTasksLoading] = useState(false)
   const [taskFilterStatus, setTaskFilterStatus] = useState<string>('ALL')
+  const [selectedFilterProductId, setSelectedFilterProductId] = useState<string>('ALL')
+  const [selectedFilterProjectId, setSelectedFilterProjectId] = useState<string>('ALL')
+
+  // Task creation
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskBrief, setNewTaskBrief] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [newTaskExecutor, setNewTaskExecutor] = useState('')
+
+  // Product creation
+  const [isCreateProductOpen, setIsCreateProductOpen] = useState(false)
+  const [newProductName, setNewProductName] = useState('')
+  const [newProductPurpose, setNewProductPurpose] = useState('')
+
+  // Project creation
+  const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectOutcome, setNewProjectOutcome] = useState('')
+  const [newProjectProductId, setNewProjectProductId] = useState('')
 
   const fetchApprovals = useCallback(async () => {
     if (!selectedEndpoint) return
@@ -133,14 +163,18 @@ export const OperationsView = () => {
     if (!selectedEndpoint) return
     setIsTasksLoading(true)
     try {
-      const [prods, projs, ts] = await Promise.all([
+      const [prods, projs, ts, tms, ags] = await Promise.all([
         getCompanyProductsAPI(selectedEndpoint, authToken),
         getCompanyProjectsAPI(selectedEndpoint, authToken),
-        getCompanyTasksAPI(selectedEndpoint, authToken)
+        getCompanyTasksAPI(selectedEndpoint, authToken),
+        getTeamsAPI(selectedEndpoint, authToken),
+        getAgentsAPI(selectedEndpoint, authToken)
       ])
       setProducts(prods)
       setProjects(projs)
       setTasks(ts)
+      setAvailableTeams(tms)
+      setAvailableAgents(ags.filter((a) => !a.id.endsWith('-internal')))
       if (prods.length > 0 && !selectedProductId) {
         setSelectedProductId(prods[0].id)
       }
@@ -195,20 +229,80 @@ export const OperationsView = () => {
     if (ok) fetchQueue()
   }
 
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newProductName.trim()) return
+    const created = await createCompanyProductAPI(
+      selectedEndpoint,
+      newProductName.trim(),
+      newProductPurpose.trim() || undefined,
+      authToken
+    )
+    if (created) {
+      setNewProductName('')
+      setNewProductPurpose('')
+      setIsCreateProductOpen(false)
+      fetchTasks()
+    }
+  }
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const targetProdId = newProjectProductId || selectedProductId || products[0]?.id
+    if (!newProjectName.trim() || !targetProdId) return
+    const created = await createCompanyProjectAPI(
+      selectedEndpoint,
+      targetProdId,
+      newProjectName.trim(),
+      newProjectOutcome.trim() || undefined,
+      authToken
+    )
+    if (created) {
+      setNewProjectName('')
+      setNewProjectOutcome('')
+      setIsCreateProjectOpen(false)
+      fetchTasks()
+    }
+  }
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newTaskTitle.trim() || !selectedProductId) return
+    const targetProdId = selectedProductId || products[0]?.id
+    if (!newTaskTitle.trim() || !targetProdId) return
+
+    const productProjects = projects.filter((p) => p.product_id === targetProdId)
+    const targetProjId =
+      selectedProjectId && productProjects.some((p) => p.id === selectedProjectId)
+        ? selectedProjectId
+        : productProjects[0]?.id
+
+    if (!targetProjId) {
+      toast.error('Please create a project under this product first')
+      return
+    }
+
+    let executorType: string | null = null
+    let executorId: string | null = null
+    if (newTaskExecutor) {
+      const [type, id] = newTaskExecutor.split(':')
+      executorType = type
+      executorId = id
+    }
+
     const ok = await createCompanyTaskAPI(
       selectedEndpoint,
-      selectedProductId,
-      selectedProjectId || (projects[0]?.id || 'default'),
+      targetProdId,
+      targetProjId,
       newTaskTitle.trim(),
       newTaskBrief.trim(),
+      executorType,
+      executorId,
       authToken
     )
     if (ok) {
       setNewTaskTitle('')
       setNewTaskBrief('')
+      setNewTaskExecutor('')
       setIsCreateTaskOpen(false)
       fetchTasks()
     }
@@ -227,6 +321,8 @@ export const OperationsView = () => {
 
   const filteredTasks = tasks.filter((t) => {
     if (taskFilterStatus !== 'ALL' && t.status !== taskFilterStatus) return false
+    if (selectedFilterProductId !== 'ALL' && t.product_id !== selectedFilterProductId) return false
+    if (selectedFilterProjectId !== 'ALL' && t.project_id !== selectedFilterProjectId) return false
     return true
   })
 
@@ -639,7 +735,7 @@ export const OperationsView = () => {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={fetchTasks}
                   disabled={isTasksLoading}
@@ -652,6 +748,27 @@ export const OperationsView = () => {
                 </button>
 
                 <button
+                  onClick={() => setIsCreateProductOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-accent/40 px-3 py-1.5 text-xs text-primary hover:bg-accent/60 transition shadow-sm"
+                >
+                  <PackagePlus className="size-3.5" /> New Product
+                </button>
+
+                <button
+                  onClick={() => {
+                    setNewProjectProductId(
+                      selectedFilterProductId !== 'ALL'
+                        ? selectedFilterProductId
+                        : selectedProductId || products[0]?.id || ''
+                    )
+                    setIsCreateProjectOpen(true)
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-accent/40 px-3 py-1.5 text-xs text-primary hover:bg-accent/60 transition shadow-sm"
+                >
+                  <FolderPlus className="size-3.5" /> New Project
+                </button>
+
+                <button
                   onClick={() => setIsCreateTaskOpen(true)}
                   className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-background hover:bg-primary/90 transition shadow-sm"
                 >
@@ -660,21 +777,67 @@ export const OperationsView = () => {
               </div>
             </div>
 
-            {/* Task Status Filter Bar */}
-            <div className="flex rounded-xl border border-primary/15 bg-accent/30 p-1 text-xs w-fit">
-              {['ALL', 'backlog', 'ready', 'in_progress', 'done'].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setTaskFilterStatus(st)}
-                  className={`rounded-lg px-3 py-1 text-[11px] capitalize ${
-                    taskFilterStatus === st
-                      ? 'bg-primary/20 text-primary font-semibold'
-                      : 'text-muted hover:text-foreground'
-                  }`}
+            {/* Filter Controls Bar */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Product Filter */}
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-[11px] text-muted">Product:</span>
+                <select
+                  value={selectedFilterProductId}
+                  onChange={(e) => {
+                    setSelectedFilterProductId(e.target.value)
+                    setSelectedFilterProjectId('ALL')
+                  }}
+                  className="h-8 rounded-lg border border-primary/15 bg-accent/30 px-2 text-[11px] text-foreground focus:border-primary focus:outline-none"
                 >
-                  {st.replace('_', ' ')}
-                </button>
-              ))}
+                  <option value="ALL">All Products ({products.length})</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name || p.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Project Filter */}
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-[11px] text-muted">Project:</span>
+                <select
+                  value={selectedFilterProjectId}
+                  onChange={(e) => setSelectedFilterProjectId(e.target.value)}
+                  className="h-8 rounded-lg border border-primary/15 bg-accent/30 px-2 text-[11px] text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="ALL">All Projects</option>
+                  {projects
+                    .filter(
+                      (p) =>
+                        selectedFilterProductId === 'ALL' ||
+                        p.product_id === selectedFilterProductId
+                    )
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Task Status Filter Bar */}
+              <div className="flex rounded-xl border border-primary/15 bg-accent/30 p-1 text-xs">
+                {['ALL', 'backlog', 'ready', 'in_progress', 'done'].map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setTaskFilterStatus(st)}
+                    className={`rounded-lg px-2.5 py-0.5 text-[11px] capitalize ${
+                      taskFilterStatus === st
+                        ? 'bg-primary/20 text-primary font-semibold'
+                        : 'text-muted hover:text-foreground'
+                    }`}
+                  >
+                    {st.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Tasks Grid */}
@@ -683,85 +846,114 @@ export const OperationsView = () => {
                 <div className="col-span-3 rounded-xl border border-primary/15 bg-accent/20 p-8 text-center text-xs text-muted">
                   {isTasksLoading
                     ? 'Loading tasks...'
-                    : 'No tasks found. Propose a task or let the `agentos-maintenance` routine propose maintenance work!'}
+                    : 'No tasks found. Propose a task, create a project, or let the `agentos-maintenance` routine propose maintenance work!'}
                 </div>
               ) : (
-                filteredTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex flex-col justify-between rounded-xl border border-primary/15 bg-accent/30 p-4 space-y-3"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase border ${
-                            task.status === 'done'
-                              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                              : task.status === 'in_progress'
-                              ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
-                              : task.status === 'ready'
-                              ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                              : 'bg-zinc-500/15 border-zinc-500/30 text-zinc-400'
-                          }`}
-                        >
-                          {task.status.replace('_', ' ')}
+                filteredTasks.map((task) => {
+                  const assignedTeam = availableTeams.find((t) => t.id === task.executor_id)
+                  const assignedAgent = availableAgents.find((a) => a.id === task.executor_id)
+                  const proj = projects.find((p) => p.id === task.project_id)
+                  const prod = products.find((p) => p.id === task.product_id)
+
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex flex-col justify-between rounded-xl border border-primary/15 bg-accent/30 p-4 space-y-3"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1">
+                          <span
+                            className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase border ${
+                              task.status === 'done'
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                : task.status === 'in_progress'
+                                ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
+                                : task.status === 'ready'
+                                ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                                : 'bg-zinc-500/15 border-zinc-500/30 text-zinc-400'
+                            }`}
+                          >
+                            {task.status.replace('_', ' ')}
+                          </span>
+
+                          {task.executor_id && (
+                            <span className="flex items-center gap-1 rounded bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[10px] text-primary truncate max-w-[150px]">
+                              {task.executor_type === 'team' ? (
+                                <Users className="size-3 shrink-0" />
+                              ) : (
+                                <User className="size-3 shrink-0" />
+                              )}
+                              <span className="truncate">
+                                {assignedTeam?.name || assignedAgent?.name || task.executor_id}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="mt-2 text-xs font-semibold text-foreground">
+                          {task.title}
+                        </h4>
+
+                        {task.brief && (
+                          <p className="mt-1 text-[11px] text-muted line-clamp-3">
+                            {task.brief}
+                          </p>
+                        )}
+
+                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+                          {prod && (
+                            <span className="flex items-center gap-1 rounded bg-accent/40 border border-primary/10 px-1.5 py-0.5 text-muted">
+                              <Package className="size-2.5 text-muted" />
+                              {prod.name || prod.id}
+                            </span>
+                          )}
+                          {proj && (
+                            <span className="flex items-center gap-1 rounded bg-accent/40 border border-primary/10 px-1.5 py-0.5 text-muted">
+                              <Folder className="size-2.5 text-muted" />
+                              {proj.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-primary/10 pt-2 text-[10px] text-muted">
+                        <span>
+                          {task.created_at
+                            ? dayjs(task.created_at * 1000).fromNow()
+                            : ''}
                         </span>
 
-                        {task.executor_id && (
-                          <span className="text-[10px] text-muted truncate max-w-[120px]">
-                            {task.executor_id}
-                          </span>
-                        )}
-                      </div>
-
-                      <h4 className="mt-2 text-xs font-semibold text-foreground">
-                        {task.title}
-                      </h4>
-
-                      {task.brief && (
-                        <p className="mt-1 text-[11px] text-muted line-clamp-3">
-                          {task.brief}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between border-t border-primary/10 pt-2 text-[10px] text-muted">
-                      <span>
-                        {task.created_at
-                          ? dayjs(task.created_at * 1000).fromNow()
-                          : ''}
-                      </span>
-
-                      {/* State transitions */}
-                      <div className="flex items-center gap-1.5">
-                        {task.status === 'backlog' && (
-                          <button
-                            onClick={() => handleTransitionTask(task.id, 'ready')}
-                            className="rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] text-primary hover:bg-primary/20"
-                          >
-                            Mark Ready &rarr;
-                          </button>
-                        )}
-                        {task.status === 'ready' && (
-                          <button
-                            onClick={() => handleTransitionTask(task.id, 'in_progress')}
-                            className="rounded bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[10px] text-blue-300 hover:bg-blue-500/20"
-                          >
-                            Start &rarr;
-                          </button>
-                        )}
-                        {task.status === 'in_progress' && (
-                          <button
-                            onClick={() => handleTransitionTask(task.id, 'done')}
-                            className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-300 hover:bg-emerald-500/20"
-                          >
-                            Mark Done ✓
-                          </button>
-                        )}
+                        {/* State transitions */}
+                        <div className="flex items-center gap-1.5">
+                          {task.status === 'backlog' && (
+                            <button
+                              onClick={() => handleTransitionTask(task.id, 'ready')}
+                              className="rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] text-primary hover:bg-primary/20"
+                            >
+                              Mark Ready &rarr;
+                            </button>
+                          )}
+                          {task.status === 'ready' && (
+                            <button
+                              onClick={() => handleTransitionTask(task.id, 'in_progress')}
+                              className="rounded bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[10px] text-blue-300 hover:bg-blue-500/20"
+                            >
+                              Start &rarr;
+                            </button>
+                          )}
+                          {task.status === 'in_progress' && (
+                            <button
+                              onClick={() => handleTransitionTask(task.id, 'done')}
+                              className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-300 hover:bg-emerald-500/20"
+                            >
+                              Mark Done ✓
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
@@ -825,6 +1017,141 @@ export const OperationsView = () => {
         </div>
       )}
 
+      {/* Create Product Modal */}
+      {isCreateProductOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <PackagePlus className="size-4" /> Create Company Product
+              </h3>
+              <button
+                onClick={() => setIsCreateProductOpen(false)}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProduct} className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs text-muted uppercase">Product Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Client Portal, SaaS Platform"
+                  value={newProductName}
+                  onChange={(e) => setNewProductName(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-muted uppercase">Purpose / Scope</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Core customer-facing subscription portal with billing and analytics..."
+                  value={newProductPurpose}
+                  onChange={(e) => setNewProductPurpose(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-primary/20 bg-accent/40 p-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateProductOpen(false)}
+                  className="rounded-xl border border-primary/15 px-4 py-2 text-xs text-muted hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-background hover:bg-primary/90"
+                >
+                  Create Product
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Project Modal */}
+      {isCreateProjectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <FolderPlus className="size-4" /> Create Company Project
+              </h3>
+              <button
+                onClick={() => setIsCreateProjectOpen(false)}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProject} className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs text-muted uppercase">Company Product *</label>
+                <select
+                  value={newProjectProductId}
+                  onChange={(e) => setNewProjectProductId(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+                >
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name || p.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted uppercase">Project Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Q1 Marketing Campaign, API Refactoring"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-muted uppercase">Expected Outcome</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Increase qualified leads by 25% through multi-channel content strategy..."
+                  value={newProjectOutcome}
+                  onChange={(e) => setNewProjectOutcome(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-primary/20 bg-accent/40 p-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateProjectOpen(false)}
+                  className="rounded-xl border border-primary/15 px-4 py-2 text-xs text-muted hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-background hover:bg-primary/90"
+                >
+                  Create Project
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Create Task Modal */}
       {isCreateTaskOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -842,12 +1169,17 @@ export const OperationsView = () => {
             </div>
 
             <form onSubmit={handleCreateTask} className="mt-4 space-y-4">
-              {products.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-muted uppercase">Company Product</label>
                   <select
                     value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    onChange={(e) => {
+                      const newProdId = e.target.value
+                      setSelectedProductId(newProdId)
+                      const matchingProj = projects.find((p) => p.product_id === newProdId)
+                      setSelectedProjectId(matchingProj ? matchingProj.id : '')
+                    }}
                     className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground focus:border-primary focus:outline-none"
                   >
                     {products.map((p) => (
@@ -857,13 +1189,66 @@ export const OperationsView = () => {
                     ))}
                   </select>
                 </div>
-              )}
+
+                <div>
+                  <label className="text-xs text-muted uppercase">Project *</label>
+                  {projects.filter((p) => p.product_id === selectedProductId).length === 0 ? (
+                    <div className="mt-1 flex h-9 items-center rounded-xl border border-amber-500/30 bg-amber-500/10 px-2 text-[11px] text-amber-300">
+                      No project. Create one first!
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+                    >
+                      {projects
+                        .filter((p) => p.product_id === selectedProductId)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
               <div>
-                <label className="text-xs text-muted uppercase">Task Title</label>
+                <label className="text-xs text-muted uppercase">Assigned Executor (Team or Agent)</label>
+                <select
+                  value={newTaskExecutor}
+                  onChange={(e) => setNewTaskExecutor(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="">Unassigned</option>
+                  {availableTeams.length > 0 && (
+                    <optgroup label="Teams">
+                      {availableTeams.map((t) => (
+                        <option key={t.id} value={`team:${t.id}`}>
+                          👥 {t.name || t.id} (Team)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {availableAgents.length > 0 && (
+                    <optgroup label="Specialist Agents">
+                      {availableAgents.map((a) => (
+                        <option key={a.id} value={`agent:${a.id}`}>
+                          👤 {a.name || a.id}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted uppercase">Task Title *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Audit Agno 3.12 release notes for maintenance"
+                  placeholder="e.g. Audit competitor pricing models and draft report"
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
@@ -873,8 +1258,8 @@ export const OperationsView = () => {
               <div>
                 <label className="text-xs text-muted uppercase">Brief / Objective</label>
                 <textarea
-                  rows={4}
-                  placeholder="Detailed instructions or acceptance criteria for the task..."
+                  rows={3}
+                  placeholder="Detailed instructions or acceptance criteria for the team/agent..."
                   value={newTaskBrief}
                   onChange={(e) => setNewTaskBrief(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-primary/20 bg-accent/40 p-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"

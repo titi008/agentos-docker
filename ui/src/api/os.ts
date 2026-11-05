@@ -975,6 +975,33 @@ export const getCompanyProductsAPI = async (
   }
 }
 
+export const createCompanyProductAPI = async (
+  endpoint: string,
+  name: string,
+  purpose?: string,
+  authToken?: string
+): Promise<CompanyProduct | null> => {
+  try {
+    const response = await fetch(APIRoutes.CreateCompanyProduct(endpoint), {
+      method: 'POST',
+      headers: createHeaders(authToken),
+      body: JSON.stringify({
+        name,
+        purpose: purpose || null
+      })
+    })
+    if (!response.ok) {
+      toast.error('Failed to create product')
+      return null
+    }
+    toast.success('Product created')
+    return await response.json()
+  } catch {
+    toast.error('Error creating product')
+    return null
+  }
+}
+
 export const getCompanyProjectsAPI = async (
   endpoint: string,
   authToken?: string
@@ -991,6 +1018,35 @@ export const getCompanyProjectsAPI = async (
     return Array.isArray(result) ? result : result.data || []
   } catch {
     return []
+  }
+}
+
+export const createCompanyProjectAPI = async (
+  endpoint: string,
+  productId: string,
+  name: string,
+  outcome?: string,
+  authToken?: string
+): Promise<CompanyProject | null> => {
+  try {
+    const response = await fetch(APIRoutes.CreateCompanyProject(endpoint), {
+      method: 'POST',
+      headers: createHeaders(authToken),
+      body: JSON.stringify({
+        product_id: productId,
+        name,
+        outcome: outcome || null
+      })
+    })
+    if (!response.ok) {
+      toast.error('Failed to create project')
+      return null
+    }
+    toast.success('Project created')
+    return await response.json()
+  } catch {
+    toast.error('Error creating project')
+    return null
   }
 }
 
@@ -1019,19 +1075,26 @@ export const createCompanyTaskAPI = async (
   projectId: string,
   title: string,
   brief?: string,
+  executorType?: string | null,
+  executorId?: string | null,
   authToken?: string
 ): Promise<boolean> => {
   try {
+    const payload: Record<string, unknown> = {
+      product_id: productId,
+      project_id: projectId,
+      title,
+      brief: brief || null,
+      status: 'backlog'
+    }
+    if (executorType && executorId) {
+      payload.executor_type = executorType
+      payload.executor_id = executorId
+    }
     const response = await fetch(APIRoutes.CreateCompanyTask(endpoint), {
       method: 'POST',
       headers: createHeaders(authToken),
-      body: JSON.stringify({
-        product_id: productId,
-        project_id: projectId,
-        title,
-        brief,
-        status: 'backlog'
-      })
+      body: JSON.stringify(payload)
     })
     if (!response.ok) {
       toast.error('Failed to create task')
