@@ -7,7 +7,7 @@ import {
   type QueryClient
 } from '@tanstack/react-query'
 
-import { unwrapList, useApi } from '@/api/client'
+import { isForbiddenError, unwrapList, useApi } from '@/api/client'
 
 import type {
   JobStatus,
@@ -161,15 +161,27 @@ export function useQueueKeys() {
 
 const QUEUE_POLL_MS = 10_000
 
+/**
+ * Queue requests go without `X-User-Id`. The API turns that header into a user
+ * identity, and Agno's queue gate treats any identity without the admin scope
+ * as a regular user, so the security key (the OS's root credential) would get
+ * 403. The queue is cross-user anyway; a JWT's own identity still applies.
+ */
+export const QUEUE_REQUEST = { withUser: false } as const
+
+/** Polls, except after a 403: the token can't read the queue, so asking again won't help. */
+const pollQueue = (query: { state: { error: unknown } }) =>
+  isForbiddenError(query.state.error) ? false : QUEUE_POLL_MS
+
 export function useQueueStatsQuery() {
   const api = useApi()
   const keys = useQueueKeys()
   return useQuery({
     queryKey: keys.stats,
     queryFn: ({ signal }) =>
-      api.request<QueueStats>('/queue/stats', { signal }),
+      api.request<QueueStats>('/queue/stats', { ...QUEUE_REQUEST, signal }),
     enabled: api.ready,
-    refetchInterval: QUEUE_POLL_MS
+    refetchInterval: pollQueue
   })
 }
 
@@ -192,6 +204,7 @@ export function useQueueJobsQuery(params: {
     queryFn: ({ signal }): Promise<PageResult<QueueJob>> =>
       api
         .request<unknown>('/queue/jobs', {
+          ...QUEUE_REQUEST,
           signal,
           query: {
             status,
@@ -204,6 +217,6 @@ export function useQueueJobsQuery(params: {
         .then(readPage<QueueJob>),
     enabled: api.ready,
     placeholderData: keepPreviousData,
-    refetchInterval: search ? false : QUEUE_POLL_MS
+    refetchInterval: search ? false : pollQueue
   })
 }

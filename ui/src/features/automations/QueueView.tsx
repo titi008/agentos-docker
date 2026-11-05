@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Layers, RotateCcw, SearchX } from 'lucide-react'
+import { Layers, LockKeyhole, RotateCcw, SearchX } from 'lucide-react'
 import Link from 'next/link'
 import {
   parseAsInteger,
@@ -12,7 +12,12 @@ import {
 import { useMemo } from 'react'
 import { toast } from 'sonner'
 
-import { ApiError, getErrorMessage, useApi } from '@/api/client'
+import {
+  ApiError,
+  getErrorMessage,
+  isForbiddenError,
+  useApi
+} from '@/api/client'
 import { chatHref, SECTIONS } from '@/components/shell/nav'
 import { Button } from '@/components/ui/button'
 import { CopyButton } from '@/components/ui/code'
@@ -45,6 +50,7 @@ import { ErrorText, Pager, RefreshButton, StatusBadge } from './parts'
 import {
   JOBS_PAGE_SIZE,
   JOBS_SEARCH_LIMIT,
+  QUEUE_REQUEST,
   useQueueJobsQuery,
   useQueueKeys,
   useQueueStatsQuery
@@ -136,7 +142,10 @@ function JobRows({
     mutationFn: async () => {
       const path = `/queue/jobs/${encodeURIComponent(job.id)}/requeue`
       try {
-        return await api.request<QueueJob>(path, { method: 'POST' })
+        return await api.request<QueueJob>(path, {
+          ...QUEUE_REQUEST,
+          method: 'POST'
+        })
       } catch (error) {
         // 409: it failed within the lock grace, so its worker may still be running.
         if (!(error instanceof ApiError) || error.status !== 409) throw error
@@ -149,6 +158,7 @@ function JobRows({
         })
         if (!confirmed) return null
         return api.request<QueueJob>(path, {
+          ...QUEUE_REQUEST,
           method: 'POST',
           query: { force: true }
         })
@@ -296,6 +306,31 @@ function StatFilter({
   )
 }
 
+/** Agno serves the whole queue API to admin tokens only, so a 403 replaces the page. */
+function AdminRequired() {
+  return (
+    <EmptyState
+      icon={<LockKeyhole />}
+      title="The job queue needs admin access"
+      description={
+        <>
+          AgentOS only lets tokens with the admin scope (
+          <code className="font-mono text-[12px] text-fg-2">
+            agent_os:admin
+          </code>
+          ) see and requeue background jobs. Your current token is valid but
+          doesn&apos;t include it.
+        </>
+      }
+      action={
+        <Button size="sm" asChild>
+          <Link href="/settings">Change auth token</Link>
+        </Button>
+      }
+    />
+  )
+}
+
 export function QueueView() {
   const qc = useQueryClient()
   const keys = useQueueKeys()
@@ -338,6 +373,8 @@ export function QueueView() {
     : null
   const oldestQueued = stats.data?.oldest_queued_age_seconds
   const queueOff = jobs.error instanceof ApiError && jobs.error.status === 503
+  const forbidden =
+    isForbiddenError(jobs.error) || isForbiddenError(stats.error)
 
   const filterBy = (next: JobStatus | null) => {
     void setStatus(next)
@@ -348,20 +385,14 @@ export function QueueView() {
   if (jobs.isPending) {
     content = <LoadingRows rows={6} label="Loading jobs" />
   } else if (jobs.isError) {
-    content =
-      jobs.error instanceof ApiError && jobs.error.status === 403 ? (
-        <ErrorState
-          title="Job queue operations require an admin scope"
-          error={jobs.error}
-        />
-      ) : (
-        <ErrorState
-          title="Couldn't load jobs"
-          error={jobs.error}
-          onRetry={() => jobs.refetch()}
-          retrying={jobs.isFetching}
-        />
-      )
+    content = (
+      <ErrorState
+        title="Couldn't load jobs"
+        error={jobs.error}
+        onRetry={() => jobs.refetch()}
+        retrying={jobs.isFetching}
+      />
+    )
   } else if (rows.length === 0) {
     if (page > 1 && total > 0) {
       content = (
@@ -479,6 +510,8 @@ export function QueueView() {
                   : 'This AgentOS runs background work without the durable queue.'
               }
             />
+          ) : forbidden ? (
+            <AdminRequired />
           ) : (
             <>
               {stats.isError ? (

@@ -28,6 +28,16 @@ export class ApiError extends Error {
   get isAuthError(): boolean {
     return this.status === 401 || this.status === 403
   }
+
+  /** The token was accepted but lacks the permission (scope) this request needs. */
+  get isForbidden(): boolean {
+    return this.status === 403
+  }
+}
+
+/** True when the server accepted the token but refused the request (403). */
+export function isForbiddenError(error: unknown): boolean {
+  return error instanceof ApiError && error.isForbidden
 }
 
 export interface ApiContext {
@@ -177,14 +187,24 @@ export function unwrapList<T>(value: unknown, key?: string): T[] {
 }
 
 /** Human-readable message for any error thrown by the API layer. */
+/** Ends server text with a full stop so it reads as a sentence after ours. */
+function asSentence(text: string): string {
+  const trimmed = text.trim()
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`
+}
+
 export function getErrorMessage(error: unknown, endpoint?: string): string {
   if (error instanceof ApiError) {
     if (error.isNetworkError) {
       const host = endpoint ? normalizeEndpoint(endpoint) : 'the AgentOS server'
       return `Can't reach ${host}. Check that AgentOS is running and the host in Settings is correct.`
     }
+    if (error.isForbidden) {
+      const reason = error.detail ? ` ${asSentence(error.detail)}` : ''
+      return `Your auth token doesn't have permission for this (403).${reason}`
+    }
     if (error.isAuthError) {
-      return `The server rejected the request (${error.status}). Check the auth token in Settings.`
+      return `The server rejected the auth token (${error.status}). Check the token in Settings.`
     }
     return error.detail
       ? `The server returned ${error.status}: ${error.detail}`
