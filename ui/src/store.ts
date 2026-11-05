@@ -73,8 +73,8 @@ interface Store {
   setObservabilityTab: (tab: 'traces' | 'metrics' | 'evals') => void
   knowledgeTab: 'memories' | 'learnings' | 'knowledge' | 'filesystem'
   setKnowledgeTab: (tab: 'memories' | 'learnings' | 'knowledge' | 'filesystem') => void
-  operationsTab: 'approvals' | 'schedules' | 'queue' | 'tasks'
-  setOperationsTab: (tab: 'approvals' | 'schedules' | 'queue' | 'tasks') => void
+  operationsTab: 'approvals' | 'schedules' | 'queue' | 'tasks' | 'wiki'
+  setOperationsTab: (tab: 'approvals' | 'schedules' | 'queue' | 'tasks' | 'wiki') => void
 }
 
 export const useStore = create<Store>()(

@@ -79,6 +79,20 @@ export const APIRoutes = {
   TransitionCompanyTask: (agentOSUrl: string, taskId: string) =>
     `${agentOSUrl}/company/tasks/${taskId}/transitions`,
 
+  // Company Wiki & Playbook
+  GetCompanyWikiList: (agentOSUrl: string, productId?: string) =>
+    productId
+      ? `${agentOSUrl}/company/products/${productId}/wiki`
+      : `${agentOSUrl}/company/wiki`,
+  GetCompanyWikiPage: (agentOSUrl: string, path: string, productId?: string) =>
+    productId
+      ? `${agentOSUrl}/company/products/${productId}/wiki/${path}`
+      : `${agentOSUrl}/company/wiki/${path}`,
+  SaveCompanyWikiPage: (agentOSUrl: string, path: string, productId?: string) =>
+    productId
+      ? `${agentOSUrl}/company/products/${productId}/wiki/${path}`
+      : `${agentOSUrl}/company/wiki/${path}`,
+
   // Workflows
   GetWorkflows: (agentOSUrl: string) => `${agentOSUrl}/workflows`,
   GetWorkflow: (agentOSUrl: string, workflowId: string) =>

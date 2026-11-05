@@ -22,7 +22,10 @@ import {
   createCompanyTaskAPI,
   transitionCompanyTaskAPI,
   getTeamsAPI,
-  getAgentsAPI
+  getAgentsAPI,
+  getCompanyWikiListAPI,
+  getCompanyWikiPageAPI,
+  saveCompanyWikiPageAPI
 } from '@/api/os'
 import {
   ApprovalResponse,
@@ -33,7 +36,9 @@ import {
   CompanyProject,
   CompanyTask,
   TeamDetails,
-  AgentDetails
+  AgentDetails,
+  WikiPageMeta,
+  WikiPageResponse
 } from '@/types/os'
 import {
   ShieldCheck,
@@ -54,11 +59,16 @@ import {
   Folder,
   FolderPlus,
   Package,
-  PackagePlus
+  PackagePlus,
+  BookOpen,
+  FileText,
+  Edit3,
+  Save
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { toast } from 'sonner'
+import MarkdownRenderer from '@/components/ui/typography/MarkdownRenderer/MarkdownRenderer'
 
 dayjs.extend(relativeTime)
 
@@ -117,6 +127,21 @@ export const OperationsView = () => {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectOutcome, setNewProjectOutcome] = useState('')
   const [newProjectProductId, setNewProjectProductId] = useState('')
+
+  // Wiki state
+  const [wikiPages, setWikiPages] = useState<WikiPageMeta[]>([])
+  const [selectedWikiProductId, setSelectedWikiProductId] = useState<string>('')
+  const [selectedWikiPath, setSelectedWikiPath] = useState<string>('brief.md')
+  const [currentWikiPage, setCurrentWikiPage] = useState<WikiPageResponse | null>(null)
+  const [wikiEditorContent, setWikiEditorContent] = useState<string>('')
+  const [isWikiEditing, setIsWikiEditing] = useState<boolean>(false)
+  const [isWikiLoading, setIsWikiLoading] = useState<boolean>(false)
+  const [isWikiSaving, setIsWikiSaving] = useState<boolean>(false)
+
+  // Create Page Modal state
+  const [isCreatePageOpen, setIsCreatePageOpen] = useState<boolean>(false)
+  const [newPagePath, setNewPagePath] = useState<string>('')
+  const [newPageContent, setNewPageContent] = useState<string>('')
 
   const fetchApprovals = useCallback(async () => {
     if (!selectedEndpoint) return
@@ -186,12 +211,57 @@ export const OperationsView = () => {
     }
   }, [selectedEndpoint, authToken, selectedProductId, selectedProjectId])
 
+  const fetchWikiPages = useCallback(async () => {
+    if (!selectedEndpoint) return
+    setIsWikiLoading(true)
+    try {
+      const [pages, prods] = await Promise.all([
+        getCompanyWikiListAPI(
+          selectedEndpoint,
+          selectedWikiProductId || undefined,
+          authToken
+        ),
+        products.length === 0
+          ? getCompanyProductsAPI(selectedEndpoint, authToken)
+          : Promise.resolve(products)
+      ])
+      setWikiPages(pages)
+      if (products.length === 0 && prods.length > 0) {
+        setProducts(prods)
+      }
+
+      const targetPath =
+        selectedWikiPath && pages.some((p) => p.path === selectedWikiPath)
+          ? selectedWikiPath
+          : pages[0]?.path || ''
+      setSelectedWikiPath(targetPath)
+
+      if (targetPath) {
+        const pageData = await getCompanyWikiPageAPI(
+          selectedEndpoint,
+          targetPath,
+          selectedWikiProductId || undefined,
+          authToken
+        )
+        setCurrentWikiPage(pageData)
+        setWikiEditorContent(pageData ? pageData.content : '')
+        setIsWikiEditing(false)
+      } else {
+        setCurrentWikiPage(null)
+        setWikiEditorContent('')
+      }
+    } finally {
+      setIsWikiLoading(false)
+    }
+  }, [selectedEndpoint, authToken, selectedWikiProductId, selectedWikiPath, products])
+
   useEffect(() => {
     if (activeTab === 'approvals') fetchApprovals()
     if (activeTab === 'schedules') fetchSchedules()
     if (activeTab === 'queue') fetchQueue()
     if (activeTab === 'tasks') fetchTasks()
-  }, [activeTab, fetchApprovals, fetchSchedules, fetchQueue, fetchTasks])
+    if (activeTab === 'wiki') fetchWikiPages()
+  }, [activeTab, fetchApprovals, fetchSchedules, fetchQueue, fetchTasks, fetchWikiPages])
 
   const handleResolveApproval = async (id: string, status: 'approved' | 'rejected') => {
     const ok = await resolveApprovalAPI(selectedEndpoint, id, status, authToken)
@@ -319,6 +389,71 @@ export const OperationsView = () => {
     if (ok) fetchTasks()
   }
 
+  const handleSelectWikiPage = async (path: string) => {
+    if (!selectedEndpoint) return
+    setSelectedWikiPath(path)
+    setIsWikiLoading(true)
+    try {
+      const pageData = await getCompanyWikiPageAPI(
+        selectedEndpoint,
+        path,
+        selectedWikiProductId || undefined,
+        authToken
+      )
+      setCurrentWikiPage(pageData)
+      setWikiEditorContent(pageData ? pageData.content : '')
+      setIsWikiEditing(false)
+    } finally {
+      setIsWikiLoading(false)
+    }
+  }
+
+  const handleSaveWikiPage = async () => {
+    if (!selectedEndpoint || !currentWikiPage) return
+    setIsWikiSaving(true)
+    try {
+      const currentVersion = currentWikiPage.metadata.version ?? 0
+      const updated = await saveCompanyWikiPageAPI(
+        selectedEndpoint,
+        currentWikiPage.metadata.path,
+        wikiEditorContent,
+        currentVersion,
+        selectedWikiProductId || undefined,
+        authToken
+      )
+      if (updated) {
+        setIsWikiEditing(false)
+        fetchWikiPages()
+      }
+    } finally {
+      setIsWikiSaving(false)
+    }
+  }
+
+  const handleCreateWikiPage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedEndpoint || !newPagePath.trim()) return
+    let path = newPagePath.trim()
+    if (!path.endsWith('.md')) {
+      path += '.md'
+    }
+    const saved = await saveCompanyWikiPageAPI(
+      selectedEndpoint,
+      path,
+      newPageContent.trim() || `# ${path.replace('.md', '')}\n\n`,
+      0,
+      selectedWikiProductId || undefined,
+      authToken
+    )
+    if (saved) {
+      setNewPagePath('')
+      setNewPageContent('')
+      setIsCreatePageOpen(false)
+      setSelectedWikiPath(path)
+      fetchWikiPages()
+    }
+  }
+
   const filteredTasks = tasks.filter((t) => {
     if (taskFilterStatus !== 'ALL' && t.status !== taskFilterStatus) return false
     if (selectedFilterProductId !== 'ALL' && t.product_id !== selectedFilterProductId) return false
@@ -385,6 +520,16 @@ export const OperationsView = () => {
             }`}
           >
             <Briefcase className="size-3.5" /> Company Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab('wiki')}
+            className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+              activeTab === 'wiki'
+                ? 'bg-primary text-background font-semibold shadow-sm'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            <BookOpen className="size-3.5" /> Playbook & Wiki
           </button>
         </div>
       </div>
@@ -958,6 +1103,181 @@ export const OperationsView = () => {
             </div>
           </div>
         )}
+
+        {/* PLAYBOOK & WIKI TAB */}
+        {activeTab === 'wiki' && (
+          <div className="flex h-full flex-col space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-primary">
+                  Company & Product Playbook Wiki
+                </h2>
+                <p className="text-xs text-muted">
+                  Living documentation, operational playbooks, and strategic briefs for your products and company.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Product / Company Switcher */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-[11px] text-muted">Scope:</span>
+                  <select
+                    value={selectedWikiProductId}
+                    onChange={(e) => {
+                      setSelectedWikiProductId(e.target.value)
+                      setSelectedWikiPath('brief.md')
+                    }}
+                    className="h-8 rounded-lg border border-primary/20 bg-accent/40 px-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                  >
+                    <option value="">🏢 Company-Wide Playbook</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        📦 {p.name || p.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={fetchWikiPages}
+                  disabled={isWikiLoading}
+                  className="flex items-center gap-1.5 rounded-xl border border-primary/15 bg-accent/40 px-3 py-1.5 text-xs text-muted hover:text-foreground"
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${isWikiLoading ? 'animate-spin' : ''}`}
+                  />
+                  Refresh
+                </button>
+
+                <button
+                  onClick={() => setIsCreatePageOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-background hover:bg-primary/90 transition shadow-sm"
+                >
+                  <Plus className="size-3.5" /> New Page
+                </button>
+              </div>
+            </div>
+
+            {/* Main Wiki Layout (Sidebar + Content/Editor) */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1 min-h-[500px]">
+              {/* Left Column: Pages List */}
+              <div className="md:col-span-1 rounded-2xl border border-primary/15 bg-accent/20 p-3 flex flex-col space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted px-2 py-1">
+                  Pages ({wikiPages.length})
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-1">
+                  {wikiPages.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-muted">
+                      {isWikiLoading ? 'Loading pages...' : 'No wiki pages found.'}
+                    </div>
+                  ) : (
+                    wikiPages.map((page) => (
+                      <button
+                        key={page.path}
+                        onClick={() => handleSelectWikiPage(page.path)}
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
+                          selectedWikiPath === page.path
+                            ? 'bg-primary/15 border border-primary/30 text-primary font-medium'
+                            : 'text-muted hover:text-foreground hover:bg-accent/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <FileText className="size-3.5 shrink-0" />
+                          <span className="truncate">{page.path}</span>
+                        </div>
+                        {page.version !== undefined && page.version !== null && (
+                          <span className="text-[10px] text-muted font-mono shrink-0">
+                            v{page.version}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Page Viewer & Live Editor */}
+              <div className="md:col-span-3 rounded-2xl border border-primary/15 bg-accent/20 p-5 flex flex-col min-h-[500px]">
+                {currentWikiPage ? (
+                  <div className="flex flex-col h-full space-y-4">
+                    {/* Page Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 pb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="size-4 text-primary" />
+                        <h3 className="text-sm font-semibold text-foreground">
+                          {currentWikiPage.metadata.path}
+                        </h3>
+                        <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-muted font-mono">
+                          v{currentWikiPage.metadata.version}
+                        </span>
+                        {currentWikiPage.metadata.updated_at && (
+                          <span className="text-[10px] text-muted">
+                            Updated {dayjs(currentWikiPage.metadata.updated_at * 1000).fromNow()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isWikiEditing ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                setWikiEditorContent(currentWikiPage.content)
+                                setIsWikiEditing(false)
+                              }}
+                              className="rounded-lg border border-primary/20 px-3 py-1 text-xs text-muted hover:text-foreground"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleSaveWikiPage}
+                              disabled={isWikiSaving}
+                              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-background hover:bg-primary/90 transition shadow-sm"
+                            >
+                              <Save className="size-3.5" />
+                              {isWikiSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setIsWikiEditing(true)}
+                            className="flex items-center gap-1.5 rounded-lg border border-primary/20 bg-accent/40 px-3 py-1 text-xs text-primary hover:bg-accent/60 transition"
+                          >
+                            <Edit3 className="size-3.5" /> Edit Page
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Page Body / Editor */}
+                    <div className="flex-1 overflow-auto">
+                      {isWikiEditing ? (
+                        <div className="h-full flex flex-col space-y-2">
+                          <textarea
+                            value={wikiEditorContent}
+                            onChange={(e) => setWikiEditorContent(e.target.value)}
+                            rows={18}
+                            className="w-full flex-1 rounded-xl border border-primary/20 bg-background/80 p-4 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
+                            placeholder="Write your markdown content here..."
+                          />
+                        </div>
+                      ) : (
+                        <div className="prose prose-invert max-w-none text-xs leading-relaxed p-2">
+                          <MarkdownRenderer>{currentWikiPage.content}</MarkdownRenderer>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-1 items-center justify-center text-xs text-muted">
+                    {isWikiLoading ? 'Loading page content...' : 'Select a page on the left or create a new page.'}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Schedule Runs Modal */}
@@ -1279,6 +1599,75 @@ export const OperationsView = () => {
                   className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-background hover:bg-primary/90"
                 >
                   Create Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Wiki Page Modal */}
+      {isCreatePageOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-primary/20 bg-background p-6 shadow-2xl font-dmmono">
+            <div className="flex items-center justify-between border-b border-primary/15 pb-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <FileText className="size-4" /> Create Wiki Page
+              </h3>
+              <button
+                onClick={() => setIsCreatePageOpen(false)}
+                className="text-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWikiPage} className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs text-muted uppercase">Target Scope</label>
+                <div className="mt-1 flex h-9 items-center rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground">
+                  {selectedWikiProductId
+                    ? `📦 ${products.find((p) => p.id === selectedWikiProductId)?.name || selectedWikiProductId}`
+                    : '🏢 Company-Wide Playbook'}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted uppercase">Page Path / Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. architecture.md, playbook.md, rules.md"
+                  value={newPagePath}
+                  onChange={(e) => setNewPagePath(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-muted uppercase">Initial Markdown Content</label>
+                <textarea
+                  rows={4}
+                  placeholder="# Page Title&#10;&#10;Documentation and guidelines..."
+                  value={newPageContent}
+                  onChange={(e) => setNewPageContent(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-primary/20 bg-accent/40 p-3 text-xs text-foreground placeholder:text-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatePageOpen(false)}
+                  className="rounded-xl border border-primary/15 px-4 py-2 text-xs text-muted hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-background hover:bg-primary/90"
+                >
+                  Create Page
                 </button>
               </div>
             </form>

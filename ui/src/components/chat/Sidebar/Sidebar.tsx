@@ -858,6 +858,17 @@ const SidebarContent = ({
                   <Briefcase className="size-3.5" />
                   <span>Company Tasks</span>
                 </button>
+                <button
+                  onClick={() => handleNavClick('operations', 'wiki')}
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 transition ${
+                    activeView === 'operations' && operationsTab === 'wiki'
+                      ? 'bg-accent/50 text-foreground font-medium'
+                      : 'text-muted hover:text-foreground hover:bg-accent/20'
+                  }`}
+                >
+                  <BookOpen className="size-3.5" />
+                  <span>Playbook & Wiki</span>
+                </button>
               </div>
             )}
           </div>

@@ -635,6 +635,20 @@ export interface CompanyTask {
   updated_at?: number
 }
 
+// Company Wiki & Playbook
+export interface WikiPageMeta {
+  path: string
+  size_bytes: number
+  version?: number | null
+  updated_at?: number | null
+  user_id?: string | null
+}
+
+export interface WikiPageResponse {
+  content: string
+  metadata: WikiPageMeta
+}
+
 // Workflows
 export interface WorkflowSummaryResponse {
   id: string

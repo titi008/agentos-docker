@@ -25,6 +25,8 @@ import {
   CompanyProduct,
   CompanyProject,
   CompanyTask,
+  WikiPageMeta,
+  WikiPageResponse,
   WorkflowSummaryResponse,
   ComponentResponse,
   ComponentConfigResponse,
@@ -1133,6 +1135,72 @@ export const transitionCompanyTaskAPI = async (
   } catch {
     toast.error('Error transitioning task')
     return false
+  }
+}
+
+// Company Wiki & Playbook
+export const getCompanyWikiListAPI = async (
+  endpoint: string,
+  productId?: string,
+  authToken?: string
+): Promise<WikiPageMeta[]> => {
+  try {
+    const response = await fetch(APIRoutes.GetCompanyWikiList(endpoint, productId), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return []
+    const json = await response.json()
+    return Array.isArray(json) ? json : json.data || []
+  } catch {
+    return []
+  }
+}
+
+export const getCompanyWikiPageAPI = async (
+  endpoint: string,
+  path: string,
+  productId?: string,
+  authToken?: string
+): Promise<WikiPageResponse | null> => {
+  try {
+    const response = await fetch(APIRoutes.GetCompanyWikiPage(endpoint, path, productId), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+export const saveCompanyWikiPageAPI = async (
+  endpoint: string,
+  path: string,
+  content: string,
+  expectedVersion: number,
+  productId?: string,
+  authToken?: string
+): Promise<WikiPageMeta | null> => {
+  try {
+    const response = await fetch(APIRoutes.SaveCompanyWikiPage(endpoint, path, productId), {
+      method: 'PUT',
+      headers: createHeaders(authToken),
+      body: JSON.stringify({
+        content,
+        expected_version: expectedVersion
+      })
+    })
+    if (!response.ok) {
+      toast.error('Failed to save wiki page')
+      return null
+    }
+    toast.success('Wiki page saved')
+    return await response.json()
+  } catch {
+    toast.error('Error saving wiki page')
+    return null
   }
 }
 
