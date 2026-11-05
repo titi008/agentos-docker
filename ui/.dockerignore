@@ -1,0 +1,15 @@
+# Installed and built inside the image; host copies would overwrite them.
+node_modules
+.next
+out
+coverage
+
+# Local-only files
+.git
+.github
+.vscode
+.env*
+!.env.example
+*.log
+*.tsbuildinfo
+.DS_Store

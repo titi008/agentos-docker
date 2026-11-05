@@ -1,10 +1,13 @@
 FROM node:24-alpine AS base
 ENV NEXT_TELEMETRY_DISABLED=1
+# pnpm comes from the "packageManager" pin in package.json.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml holds the dependency overrides the lockfile was resolved with.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
