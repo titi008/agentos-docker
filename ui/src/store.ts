@@ -9,114 +9,115 @@ import {
   type ChatMessage
 } from '@/types/os'
 
+export type ChatMode = 'agent' | 'team' | 'workflow'
+
+/** The chat whose transcript is in `messages`; `sessionId` is null for a new chat. */
+export interface ChatLocation {
+  kind: ChatMode
+  id: string
+  sessionId: string | null
+  dbId: string | null
+}
+
 interface Store {
   hydrated: boolean
   setHydrated: () => void
-  streamingErrorMessage: string
-  setStreamingErrorMessage: (streamingErrorMessage: string) => void
-  endpoints: {
-    endpoint: string
-    id__endpoint: string
-  }[]
-  setEndpoints: (
-    endpoints: {
-      endpoint: string
-      id__endpoint: string
-    }[]
-  ) => void
-  isStreaming: boolean
-  setIsStreaming: (isStreaming: boolean) => void
-  isEndpointActive: boolean
-  setIsEndpointActive: (isActive: boolean) => void
-  isEndpointLoading: boolean
-  setIsEndpointLoading: (isLoading: boolean) => void
-  messages: ChatMessage[]
-  setMessages: (
-    messages: ChatMessage[] | ((prevMessages: ChatMessage[]) => ChatMessage[])
-  ) => void
-  chatInputRef: React.RefObject<HTMLTextAreaElement | null>
+
+  /* Connection (persisted) */
   selectedEndpoint: string
   setSelectedEndpoint: (selectedEndpoint: string) => void
   authToken: string
   setAuthToken: (authToken: string) => void
+  userId: string
+  setUserId: (userId: string) => void
+
+  /* Workspace, loaded by the app shell */
+  isEndpointActive: boolean
+  setIsEndpointActive: (isActive: boolean) => void
+  isEndpointLoading: boolean
+  setIsEndpointLoading: (isLoading: boolean) => void
   agents: AgentDetails[]
   setAgents: (agents: AgentDetails[]) => void
   teams: TeamDetails[]
   setTeams: (teams: TeamDetails[]) => void
   workflows: WorkflowSummaryResponse[]
   setWorkflows: (workflows: WorkflowSummaryResponse[]) => void
+  pendingApprovalsCount: number
+  setPendingApprovalsCount: (count: number) => void
+
+  /* Chat */
+  /** Model id sent as X-Model-Override with each run; '' uses the target's own model. */
   selectedModel: string
   setSelectedModel: (model: string) => void
-  mode: 'agent' | 'team' | 'workflow'
-  setMode: (mode: 'agent' | 'team' | 'workflow') => void
+  messages: ChatMessage[]
+  setMessages: (
+    messages: ChatMessage[] | ((prevMessages: ChatMessage[]) => ChatMessage[])
+  ) => void
+  activeChat: ChatLocation | null
+  setActiveChat: (activeChat: ChatLocation | null) => void
+  isStreaming: boolean
+  setIsStreaming: (isStreaming: boolean) => void
+  chatInputRef: React.RefObject<HTMLTextAreaElement | null>
+  /** Loaded chats of the current target, newest first (read by the command palette). */
   sessionsData: SessionEntry[] | null
   setSessionsData: (
     sessionsData:
       | SessionEntry[]
+      | null
       | ((prevSessions: SessionEntry[] | null) => SessionEntry[] | null)
   ) => void
-  isSessionsLoading: boolean
-  setIsSessionsLoading: (isSessionsLoading: boolean) => void
-  activeView: 'chat' | 'observability' | 'knowledge' | 'operations' | 'studio'
-  setActiveView: (
-    view: 'chat' | 'observability' | 'knowledge' | 'operations' | 'studio'
-  ) => void
-  pendingApprovalsCount: number
-  setPendingApprovalsCount: (count: number) => void
-  userId: string
-  setUserId: (userId: string) => void
-  isMobileSidebarOpen: boolean
-  setIsMobileSidebarOpen: (isOpen: boolean) => void
-  studioTab: 'agents' | 'teams' | 'workflows' | 'registry'
-  setStudioTab: (tab: 'agents' | 'teams' | 'workflows' | 'registry') => void
-  observabilityTab: 'traces' | 'metrics' | 'evals'
-  setObservabilityTab: (tab: 'traces' | 'metrics' | 'evals') => void
-  knowledgeTab: 'memories' | 'learnings' | 'knowledge' | 'filesystem'
-  setKnowledgeTab: (tab: 'memories' | 'learnings' | 'knowledge' | 'filesystem') => void
-  operationsTab: 'approvals' | 'schedules' | 'queue' | 'tasks' | 'wiki'
-  setOperationsTab: (tab: 'approvals' | 'schedules' | 'queue' | 'tasks' | 'wiki') => void
+
+  /* Layout (collapsed state is persisted) */
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (collapsed: boolean) => void
+  isMobileMenuOpen: boolean
+  setIsMobileMenuOpen: (isOpen: boolean) => void
+  isCommandPaletteOpen: boolean
+  setIsCommandPaletteOpen: (isOpen: boolean) => void
 }
+
+export const DEFAULT_ENDPOINT = 'http://localhost:7777'
 
 export const useStore = create<Store>()(
   persist(
     (set) => ({
       hydrated: false,
       setHydrated: () => set({ hydrated: true }),
-      streamingErrorMessage: '',
-      setStreamingErrorMessage: (streamingErrorMessage) =>
-        set(() => ({ streamingErrorMessage })),
-      endpoints: [],
-      setEndpoints: (endpoints) => set(() => ({ endpoints })),
-      isStreaming: false,
-      setIsStreaming: (isStreaming) => set(() => ({ isStreaming })),
-      isEndpointActive: false,
-      setIsEndpointActive: (isActive) =>
-        set(() => ({ isEndpointActive: isActive })),
-      isEndpointLoading: true,
-      setIsEndpointLoading: (isLoading) =>
-        set(() => ({ isEndpointLoading: isLoading })),
-      messages: [],
-      setMessages: (messages) =>
-        set((state) => ({
-          messages:
-            typeof messages === 'function' ? messages(state.messages) : messages
-        })),
-      chatInputRef: { current: null },
-      selectedEndpoint: 'http://localhost:7777',
-      setSelectedEndpoint: (selectedEndpoint) =>
-        set(() => ({ selectedEndpoint })),
+
+      selectedEndpoint: DEFAULT_ENDPOINT,
+      setSelectedEndpoint: (selectedEndpoint) => set({ selectedEndpoint }),
       authToken: '',
-      setAuthToken: (authToken) => set(() => ({ authToken })),
+      setAuthToken: (authToken) => set({ authToken }),
+      userId: 'default',
+      setUserId: (userId) => set({ userId }),
+
+      isEndpointActive: false,
+      setIsEndpointActive: (isEndpointActive) => set({ isEndpointActive }),
+      isEndpointLoading: true,
+      setIsEndpointLoading: (isEndpointLoading) => set({ isEndpointLoading }),
       agents: [],
       setAgents: (agents) => set({ agents }),
       teams: [],
       setTeams: (teams) => set({ teams }),
       workflows: [],
       setWorkflows: (workflows) => set({ workflows }),
+      pendingApprovalsCount: 0,
+      setPendingApprovalsCount: (pendingApprovalsCount) =>
+        set({ pendingApprovalsCount }),
+
       selectedModel: '',
-      setSelectedModel: (selectedModel) => set(() => ({ selectedModel })),
-      mode: 'agent',
-      setMode: (mode) => set(() => ({ mode })),
+      setSelectedModel: (selectedModel) => set({ selectedModel }),
+      messages: [],
+      setMessages: (messages) =>
+        set((state) => ({
+          messages:
+            typeof messages === 'function' ? messages(state.messages) : messages
+        })),
+      activeChat: null,
+      setActiveChat: (activeChat) => set({ activeChat }),
+      isStreaming: false,
+      setIsStreaming: (isStreaming) => set({ isStreaming }),
+      chatInputRef: { current: null },
       sessionsData: null,
       setSessionsData: (sessionsData) =>
         set((state) => ({
@@ -125,28 +126,14 @@ export const useStore = create<Store>()(
               ? sessionsData(state.sessionsData)
               : sessionsData
         })),
-      isSessionsLoading: false,
-      setIsSessionsLoading: (isSessionsLoading) =>
-        set(() => ({ isSessionsLoading })),
-      activeView: 'chat',
-      setActiveView: (activeView) => set(() => ({ activeView })),
-      pendingApprovalsCount: 0,
-      setPendingApprovalsCount: (pendingApprovalsCount) =>
-        set(() => ({ pendingApprovalsCount })),
-      userId: 'default',
-      setUserId: (userId) => set(() => ({ userId })),
-      isMobileSidebarOpen: false,
-      setIsMobileSidebarOpen: (isMobileSidebarOpen) =>
-        set(() => ({ isMobileSidebarOpen })),
-      studioTab: 'agents',
-      setStudioTab: (studioTab) => set(() => ({ studioTab })),
-      observabilityTab: 'traces',
-      setObservabilityTab: (observabilityTab) =>
-        set(() => ({ observabilityTab })),
-      knowledgeTab: 'memories',
-      setKnowledgeTab: (knowledgeTab) => set(() => ({ knowledgeTab })),
-      operationsTab: 'approvals',
-      setOperationsTab: (operationsTab) => set(() => ({ operationsTab }))
+
+      sidebarCollapsed: false,
+      setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+      isMobileMenuOpen: false,
+      setIsMobileMenuOpen: (isMobileMenuOpen) => set({ isMobileMenuOpen }),
+      isCommandPaletteOpen: false,
+      setIsCommandPaletteOpen: (isCommandPaletteOpen) =>
+        set({ isCommandPaletteOpen })
     }),
     {
       name: 'endpoint-storage',
@@ -154,7 +141,8 @@ export const useStore = create<Store>()(
       partialize: (state) => ({
         selectedEndpoint: state.selectedEndpoint,
         userId: state.userId,
-        authToken: state.authToken
+        authToken: state.authToken,
+        sidebarCollapsed: state.sidebarCollapsed
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated?.()

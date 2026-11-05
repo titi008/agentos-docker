@@ -4,5 +4,6 @@ module.exports = {
   semi: false,
   trailingComma: 'none',
   plugins: ['prettier-plugin-tailwindcss'],
-  filepath: './src/**/*.{js,ts,jsx,tsx}'
+  tailwindStylesheet: './src/app/globals.css',
+  tailwindFunctions: ['cn', 'cva']
 }

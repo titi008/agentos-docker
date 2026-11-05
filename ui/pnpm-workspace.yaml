@@ -1,0 +1,6 @@
+minimumReleaseAgeExclude:
+  - lucide-react@1.69.0
+  - '@tanstack/query-core@5.106.1'
+  - '@tanstack/react-query@5.106.1'
+overrides:
+  picomatch: '>=2.3.2'

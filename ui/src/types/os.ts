@@ -1,60 +1,3 @@
-export interface ToolCall {
-  role: 'user' | 'tool' | 'system' | 'assistant'
-  content: string | null
-  tool_call_id: string
-  tool_name: string
-  tool_args: Record<string, string>
-  tool_call_error: boolean
-  metrics: {
-    time: number
-  }
-  created_at: number
-}
-
-export interface ReasoningSteps {
-  title: string
-  action?: string
-  result: string
-  reasoning: string
-  confidence?: number
-  next_action?: string
-}
-export interface ReasoningStepProps {
-  index: number
-  stepTitle: string
-}
-export interface ReasoningProps {
-  reasoning: ReasoningSteps[]
-}
-
-export type ToolCallProps = {
-  tools: ToolCall
-}
-interface ModelMessage {
-  content: string | null
-  context?: MessageContext[]
-  created_at: number
-  metrics?: {
-    time: number
-    prompt_tokens: number
-    input_tokens: number
-    completion_tokens: number
-    output_tokens: number
-  }
-  name: string | null
-  role: string
-  tool_args?: unknown
-  tool_call_id: string | null
-  tool_calls: Array<{
-    function: {
-      arguments: string
-      name: string
-    }
-    id: string
-    type: string
-  }> | null
-}
-
 export interface Model {
   name: string
   model: string
@@ -77,167 +20,6 @@ export interface Team {
   storage?: boolean
 }
 
-interface MessageContext {
-  query: string
-  docs?: Array<Record<string, object>>
-  time?: number
-}
-
-export enum RunEvent {
-  RunStarted = 'RunStarted',
-  RunContent = 'RunContent',
-  RunCompleted = 'RunCompleted',
-  RunError = 'RunError',
-  RunOutput = 'RunOutput',
-  UpdatingMemory = 'UpdatingMemory',
-  ToolCallStarted = 'ToolCallStarted',
-  ToolCallCompleted = 'ToolCallCompleted',
-  MemoryUpdateStarted = 'MemoryUpdateStarted',
-  MemoryUpdateCompleted = 'MemoryUpdateCompleted',
-  ReasoningStarted = 'ReasoningStarted',
-  ReasoningStep = 'ReasoningStep',
-  ReasoningCompleted = 'ReasoningCompleted',
-  RunCancelled = 'RunCancelled',
-  RunPaused = 'RunPaused',
-  RunContinued = 'RunContinued',
-  // Team Events
-  TeamRunStarted = 'TeamRunStarted',
-  TeamRunContent = 'TeamRunContent',
-  TeamRunCompleted = 'TeamRunCompleted',
-  TeamRunError = 'TeamRunError',
-  TeamRunCancelled = 'TeamRunCancelled',
-  TeamToolCallStarted = 'TeamToolCallStarted',
-  TeamToolCallCompleted = 'TeamToolCallCompleted',
-  TeamReasoningStarted = 'TeamReasoningStarted',
-  TeamReasoningStep = 'TeamReasoningStep',
-  TeamReasoningCompleted = 'TeamReasoningCompleted',
-  TeamMemoryUpdateStarted = 'TeamMemoryUpdateStarted',
-  TeamMemoryUpdateCompleted = 'TeamMemoryUpdateCompleted',
-  // Workflow Events
-  WorkflowStarted = 'WorkflowStarted',
-  WorkflowCompleted = 'WorkflowCompleted',
-  WorkflowError = 'WorkflowError',
-  WorkflowCancelled = 'WorkflowCancelled',
-  StepStarted = 'StepStarted',
-  StepCompleted = 'StepCompleted',
-  StepError = 'StepError',
-  StepOutput = 'StepOutput',
-  ParallelExecutionStarted = 'ParallelExecutionStarted',
-  ParallelExecutionCompleted = 'ParallelExecutionCompleted',
-  ConditionExecutionStarted = 'ConditionExecutionStarted',
-  ConditionExecutionCompleted = 'ConditionExecutionCompleted',
-  LoopExecutionStarted = 'LoopExecutionStarted',
-  LoopIterationStarted = 'LoopIterationStarted',
-  LoopIterationCompleted = 'LoopIterationCompleted',
-  LoopExecutionCompleted = 'LoopExecutionCompleted',
-  RouterExecutionStarted = 'RouterExecutionStarted',
-  RouterExecutionCompleted = 'RouterExecutionCompleted'
-}
-
-export interface ResponseAudio {
-  id?: string
-  content?: string
-  transcript?: string
-  channels?: number
-  sample_rate?: number
-}
-
-export interface NewRunResponse {
-  status: 'RUNNING' | 'PAUSED' | 'CANCELLED'
-}
-
-export interface RunResponseContent {
-  content?: string | object
-  content_type: string
-  context?: MessageContext[]
-  event: RunEvent
-  event_data?: object
-  messages?: ModelMessage[]
-  metrics?: object
-  model?: string
-  run_id?: string
-  agent_id?: string
-  session_id?: string
-  tool?: ToolCall
-  tools?: Array<ToolCall>
-  created_at: number
-  extra_data?: AgentExtraData
-  images?: ImageData[]
-  videos?: VideoData[]
-  audio?: AudioData[]
-  response_audio?: ResponseAudio
-}
-
-export interface RunResponse {
-  content?: string | object
-  content_type: string
-  context?: MessageContext[]
-  event: RunEvent
-  event_data?: object
-  messages?: ModelMessage[]
-  metrics?: object
-  model?: string
-  run_id?: string
-  agent_id?: string
-  session_id?: string
-  tool?: ToolCall
-  tools?: Array<ToolCall>
-  created_at: number
-  extra_data?: AgentExtraData
-  images?: ImageData[]
-  videos?: VideoData[]
-  audio?: AudioData[]
-  response_audio?: ResponseAudio
-}
-
-export interface AgentExtraData {
-  reasoning_steps?: ReasoningSteps[]
-  reasoning_messages?: ReasoningMessage[]
-  references?: ReferenceData[]
-}
-
-export interface AgentExtraData {
-  reasoning_messages?: ReasoningMessage[]
-  references?: ReferenceData[]
-}
-
-export interface ReasoningMessage {
-  role: 'user' | 'tool' | 'system' | 'assistant'
-  content: string | null
-  tool_call_id?: string
-  tool_name?: string
-  tool_args?: Record<string, string>
-  tool_call_error?: boolean
-  metrics?: {
-    time: number
-  }
-  created_at?: number
-}
-
-export interface AttachedFileMeta {
-  name: string
-  size: number
-  type: string
-}
-
-export interface ChatMessage {
-  role: 'user' | 'agent' | 'system' | 'tool'
-  content: string
-  streamingError?: boolean
-  created_at: number
-  tool_calls?: ToolCall[]
-  extra_data?: {
-    reasoning_steps?: ReasoningSteps[]
-    reasoning_messages?: ReasoningMessage[]
-    references?: ReferenceData[]
-  }
-  images?: ImageData[]
-  videos?: VideoData[]
-  audio?: AudioData[]
-  response_audio?: ResponseAudio
-  files?: AttachedFileMeta[]
-}
-
 export interface AgentDetails {
   id: string
   name?: string
@@ -257,47 +39,141 @@ export interface TeamDetails {
   members?: Array<unknown>
 }
 
-export interface ImageData {
-  revised_prompt: string
-  url: string
+// Chat transcript (the chat view's own model of a conversation)
+
+/** A file the operator attached to a message. */
+export interface ChatAttachment {
+  name: string
+  size: number | null
+  type: string | null
 }
 
-export interface VideoData {
-  id: number
-  eta: number
-  url: string
+export type ChatActivityStatus = 'running' | 'done' | 'failed' | 'stopped'
+
+export interface ChatToolCall {
+  id: string
+  name: string
+  args: Record<string, unknown> | null
+  result: string | null
+  /** Error text when the tool call failed. */
+  error: string | null
+  status: ChatActivityStatus
+  durationMs: number | null
+  /** Team member or workflow step that made the call; null for the target itself. */
+  member: string | null
 }
 
-export interface AudioData {
-  base64_audio?: string
-  mime_type?: string
-  url?: string
-  id?: string
-  content?: string
-  channels?: number
-  sample_rate?: number
+export interface ChatWorkflowStep {
+  id: string
+  name: string
+  index: number | null
+  status: ChatActivityStatus
+  output: string | null
+  error: string | null
+  durationMs: number | null
 }
 
-export interface ReferenceData {
-  query: string
-  references: Reference[]
-  time?: number
+export interface ReasoningStep {
+  title?: string | null
+  action?: string | null
+  result?: string | null
+  reasoning?: string | null
+  next_action?: string | null
+  confidence?: number | null
 }
 
 export interface Reference {
-  content: string
-  meta_data: {
-    chunk: number
-    chunk_size: number
-  }
-  name: string
+  name?: string
+  content?: string
+  meta_data?: Record<string, unknown>
 }
+
+/** Knowledge retrieved for one query (agno `MessageReferences`). */
+export interface ReferenceGroup {
+  query: string
+  references?: Array<Reference | string> | null
+  time?: number | null
+}
+
+export interface ImageData {
+  id?: string
+  url?: string
+  /** Base64 bytes when the image is not hosted. */
+  content?: string
+  mime_type?: string
+  revised_prompt?: string
+  alt_text?: string
+}
+
+export interface VideoData {
+  id?: string | number
+  url?: string
+  content?: string
+  mime_type?: string
+}
+
+export interface AudioData {
+  id?: string
+  url?: string
+  /** Base64 bytes; raw PCM16 when no mime type is given. */
+  content?: string
+  base64_audio?: string
+  mime_type?: string
+  sample_rate?: number
+  channels?: number
+  transcript?: string
+}
+
+export interface ChatRunMetrics {
+  inputTokens: number | null
+  outputTokens: number | null
+  totalTokens: number | null
+  durationMs: number | null
+}
+
+/**
+ * `streaming` while the response arrives; `pending` for a run that is still
+ * executing on the server when the chat was loaded; `paused` while a run
+ * waits for an approval.
+ */
+export type ChatMessageStatus =
+  'streaming' | 'done' | 'error' | 'cancelled' | 'paused' | 'pending'
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'agent'
+  /** Markdown. */
+  content: string
+  /** Epoch milliseconds. */
+  createdAt: number
+  files?: ChatAttachment[]
+  /** Display name of the agent, team or workflow that answered. */
+  author?: string
+  runId?: string | null
+  model?: string | null
+  status?: ChatMessageStatus
+  error?: string | null
+  reasoningSteps?: ReasoningStep[]
+  /** Free-form thinking text from reasoning models. */
+  reasoningContent?: string
+  toolCalls?: ChatToolCall[]
+  steps?: ChatWorkflowStep[]
+  references?: ReferenceGroup[]
+  images?: ImageData[]
+  videos?: VideoData[]
+  audio?: AudioData[]
+  responseAudio?: AudioData | null
+  metrics?: ChatRunMetrics | null
+}
+
+// Sessions (GET /sessions, agno SessionSchema)
 
 export interface SessionEntry {
   session_id: string
   session_name: string
-  created_at: number
-  updated_at?: number
+  /** ISO date from AgentOS; unix seconds in older responses. */
+  created_at?: string | number | null
+  updated_at?: string | number | null
 }
 
 export interface Pagination {
@@ -307,33 +183,108 @@ export interface Pagination {
   total_count: number
 }
 
-export interface Sessions extends SessionEntry {
+export interface Sessions {
   data: SessionEntry[]
   meta: Pagination
 }
 
-export interface ChatEntry {
-  message: {
-    role: 'user' | 'system' | 'tool' | 'assistant'
-    content: string
-    created_at: number
-  }
-  response: {
-    content: string
-    tools?: ToolCall[]
-    extra_data?: {
-      reasoning_steps?: ReasoningSteps[]
-      reasoning_messages?: ReasoningMessage[]
-      references?: ReferenceData[]
-    }
-    images?: ImageData[]
-    videos?: VideoData[]
-    audio?: AudioData[]
-    response_audio?: {
-      transcript?: string
-    }
-    created_at: number
-  }
+// Runs as AgentOS streams and stores them (agno 3.1)
+
+/** agno `ToolExecution`. */
+export interface ToolExecution {
+  tool_call_id?: string | null
+  tool_name?: string | null
+  tool_args?: Record<string, unknown> | null
+  tool_call_error?: boolean | null
+  result?: unknown
+  metrics?: { duration?: number | null; time?: number | null } | null
+  created_at?: number | null
+}
+
+/** agno `RunMetrics`; durations are in seconds. */
+export interface RunMetricsPayload {
+  input_tokens?: number | null
+  output_tokens?: number | null
+  total_tokens?: number | null
+  duration?: number | null
+  details?: Record<string, Array<{ id?: string; provider?: string }>> | null
+}
+
+/** agno `StepOutput`. */
+export interface StepOutputPayload {
+  step_name?: string | null
+  step_id?: string | null
+  content?: unknown
+  success?: boolean | null
+  error?: string | null
+  metrics?: RunMetricsPayload | null
+}
+
+/** One server-sent event of an agent, team or workflow run. */
+export interface RunEventPayload {
+  event: string
+  run_id?: string | null
+  parent_run_id?: string | null
+  session_id?: string | null
+  agent_id?: string | null
+  agent_name?: string | null
+  team_id?: string | null
+  team_name?: string | null
+  workflow_id?: string | null
+  step_id?: string | null
+  step_name?: string | null
+  step_index?: number | number[] | null
+  /** 0 for the top-level workflow, higher for nested workflows. */
+  nested_depth?: number | null
+  content?: unknown
+  reasoning_content?: string | null
+  reasoning_steps?: ReasoningStep[] | null
+  references?: ReferenceGroup[] | null
+  tool?: ToolExecution | null
+  tools?: ToolExecution[] | null
+  images?: ImageData[] | null
+  image?: ImageData | null
+  videos?: VideoData[] | null
+  audio?: AudioData[] | null
+  response_audio?: AudioData | null
+  metrics?: RunMetricsPayload | null
+  model?: string | null
+  error?: string | null
+  reason?: string | null
+  step_output?: StepOutputPayload | null
+  step_response?: StepOutputPayload | null
+  created_at?: number | null
+}
+
+/** A run from GET /sessions/{id}/runs (agno RunSchema, TeamRunSchema or WorkflowRunSchema). */
+export interface SessionRun {
+  run_id: string
+  parent_run_id?: string | null
+  agent_id?: string | null
+  team_id?: string | null
+  workflow_id?: string | null
+  status?: string | null
+  run_input?: string | null
+  content?: unknown
+  reasoning_content?: string | null
+  reasoning_steps?: ReasoningStep[] | null
+  metrics?: RunMetricsPayload | null
+  tools?: ToolExecution[] | null
+  references?: ReferenceGroup[] | null
+  images?: ImageData[] | null
+  videos?: VideoData[] | null
+  audio?: AudioData[] | null
+  response_audio?: AudioData | null
+  input_media?: {
+    images?: unknown[]
+    videos?: unknown[]
+    audios?: unknown[]
+    files?: unknown[]
+  } | null
+  step_results?: StepOutputPayload[] | null
+  /** Session state at the end of the run (holds this app's `model_override`). */
+  session_state?: Record<string, unknown> | null
+  created_at?: string | number | null
 }
 
 // Observability & Traces
@@ -428,170 +379,6 @@ export interface PricingResponse {
   history: ModelPriceRate[]
 }
 
-export interface ProviderCostSummary {
-  provider: string
-  runs: number
-  input_tokens: number
-  output_tokens: number
-  total_tokens: number
-  total_cost: number
-  percentage: number
-}
-
-export interface ModelCostSummary {
-  model_id: string
-  provider: string
-  runs: number
-  input_tokens: number
-  output_tokens: number
-  total_tokens: number
-  total_cost: number
-}
-
-export interface DailyCostSummary {
-  date: string
-  runs: number
-  input_tokens: number
-  output_tokens: number
-  total_tokens: number
-  total_cost: number
-}
-
-export interface CostBreakdownResponse {
-  total_cost: number
-  total_runs: number
-  total_tokens: number
-  total_input_tokens: number
-  total_output_tokens: number
-  by_provider: ProviderCostSummary[]
-  by_model: ModelCostSummary[]
-  daily_history: DailyCostSummary[]
-  rates: ModelPriceRate[]
-}
-
-export interface EvalSchema {
-  id: string
-  agent_id?: string
-  team_id?: string
-  workflow_id?: string
-  model_id?: string
-  model_provider?: string
-  name?: string
-  evaluated_component_name?: string
-  eval_type: 'accuracy' | 'reliability' | 'performance' | string
-  eval_data: {
-    eval_status?: 'PASSED' | 'FAILED' | string
-    score?: number
-    failed_tool_calls?: string[]
-    passed_tool_calls?: string[]
-    metrics?: Record<string, unknown>
-    reason?: string
-  }
-  eval_input?: {
-    expected_tool_calls?: string[]
-    expected_output?: string
-    criteria?: string
-  }
-  created_at?: string
-  updated_at?: string
-}
-
-// Memory & Learnings
-export interface UserMemorySchema {
-  memory_id: string
-  memory: string
-  topics?: string[]
-  agent_id?: string
-  team_id?: string
-  user_id?: string
-  updated_at?: string
-}
-
-export interface UserStatsSchema {
-  user_id: string
-  total_memories: number
-  last_memory_updated_at?: string
-}
-
-export interface LearningResponse {
-  learning_id: string
-  learning_type: string
-  namespace?: string
-  user_id?: string
-  agent_id?: string
-  team_id?: string
-  session_id?: string
-  entity_id?: string
-  entity_type?: string
-  content?: Record<string, unknown>
-  metadata?: Record<string, unknown>
-  created_at?: number
-  updated_at?: number
-}
-
-// Knowledge Base
-export interface ContentResponseSchema {
-  id: string
-  name?: string
-  description?: string
-  type?: string
-  size?: string
-  status?: 'processing' | 'completed' | 'failed' | string
-  status_message?: string
-  created_at?: string
-  updated_at?: string
-}
-
-export interface VectorSearchResult {
-  id?: string
-  content: string
-  name?: string
-  meta_data?: Record<string, unknown>
-  reranking_score?: number
-}
-
-// Operations & Scheduling
-export interface ScheduleResponse {
-  id: string
-  name: string
-  description?: string
-  method: string
-  endpoint: string
-  cron_expr?: string
-  timezone: string
-  enabled: boolean
-  next_run_at?: number
-  created_at?: number
-  updated_at?: number
-}
-
-export interface ScheduleRunResponse {
-  id: string
-  schedule_id: string
-  attempt: number
-  triggered_at?: number
-  completed_at?: number
-  status: 'SUCCESS' | 'FAILED' | 'RUNNING' | string
-  error?: string
-  output?: Record<string, unknown>
-  created_at?: number
-}
-
-// Job Queue
-export interface QueueJobSchema {
-  id: string
-  component_type: string
-  component_id: string
-  session_id: string
-  job_type: string
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string
-  attempt: number
-  max_attempts: number
-  error?: string
-  created_at?: number
-  completed_at?: number
-}
-
 // Approvals
 export interface ApprovalResponse {
   id: string
@@ -605,36 +392,6 @@ export interface ApprovalResponse {
   created_at?: number
 }
 
-// Company Tasks
-export interface CompanyProduct {
-  id: string
-  name: string
-  purpose?: string
-  created_at?: number
-}
-
-export interface CompanyProject {
-  id: string
-  product_id: string
-  name: string
-  outcome?: string
-  status: 'active' | 'completed' | 'archived' | string
-  created_at?: number
-}
-
-export interface CompanyTask {
-  id: string
-  product_id: string
-  project_id?: string
-  title: string
-  brief?: string
-  status: 'backlog' | 'ready' | 'in_progress' | 'in_review' | 'done' | 'cancelled'
-  executor_type?: string
-  executor_id?: string
-  created_at?: number
-  updated_at?: number
-}
-
 // Company Wiki & Playbook
 export interface WikiPageMeta {
   path: string
@@ -642,11 +399,6 @@ export interface WikiPageMeta {
   version?: number | null
   updated_at?: number | null
   user_id?: string | null
-}
-
-export interface WikiPageResponse {
-  content: string
-  metadata: WikiPageMeta
 }
 
 // Workflows
@@ -693,28 +445,6 @@ export interface ComponentConfigResponse {
   updated_at?: number
 }
 
-export interface ComponentCreatePayload {
-  name: string
-  component_id?: string
-  component_type: 'agent' | 'team' | 'workflow'
-  description?: string
-  metadata?: Record<string, unknown>
-  config?: Record<string, unknown>
-  label?: string
-  stage?: 'draft' | 'published'
-  notes?: string
-  set_current?: boolean
-}
-
-export interface ConfigCreatePayload {
-  config: Record<string, unknown>
-  version?: number
-  label?: string
-  stage?: 'draft' | 'published'
-  notes?: string
-  set_current?: boolean
-}
-
 // Registry
 export interface RegistryContentResponse {
   name: string
@@ -724,43 +454,3 @@ export interface RegistryContentResponse {
   metadata?: Record<string, unknown>
   sandboxed?: boolean
 }
-
-// Filesystem
-export interface FileSystemEntry {
-  path: string
-  type: 'file' | 'directory'
-  size_bytes?: number
-  version?: number
-  updated_at?: number
-  user_id?: string
-}
-
-export interface FileSystemTableEntry {
-  namespace: string
-  path: string
-  agent_ids: string[]
-  size_bytes?: number
-  version?: number
-  updated_at?: number
-  user_id?: string
-  snippet?: string
-  line?: number
-  match_count?: number
-}
-
-export interface FileSystemContentResponse {
-  namespace: string
-  agent_ids: string[]
-  path: string
-  content: string
-  size_bytes?: number
-  version?: number
-  updated_at?: number
-  user_id?: string
-  line_count: number
-  truncated: boolean
-  offset: number
-  limit: number
-  next_offset?: number | null
-}
-

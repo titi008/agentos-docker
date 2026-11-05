@@ -1,36 +1,47 @@
-import type { Metadata } from 'next'
-import { DM_Mono, Geist } from 'next/font/google'
-import { NuqsAdapter } from 'nuqs/adapters/next/app'
-import { Toaster } from '@/components/ui/sonner'
+import type { Metadata, Viewport } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+
+import { Providers } from '@/components/providers'
+import { AppShell } from '@/components/shell/AppShell'
+
 import './globals.css'
+
 const geistSans = Geist({
   variable: '--font-geist-sans',
-  weight: '400',
-  subsets: ['latin']
+  subsets: ['latin'],
+  display: 'swap'
 })
 
-const dmMono = DM_Mono({
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
   subsets: ['latin'],
-  variable: '--font-dm-mono',
-  weight: '400'
+  display: 'swap'
 })
 
 export const metadata: Metadata = {
-  title: 'Agent UI',
+  title: { default: 'AgentOS', template: '%s · AgentOS' },
   description:
-    'A modern chat interface for AI agents built with Next.js, Tailwind CSS, and TypeScript. This template provides a ready-to-use UI for interacting with Agno agents.'
+    'Chat with your agents, approve their actions, and manage the company, automations, knowledge and monitoring of your AgentOS.'
+}
+
+export const viewport: Viewport = {
+  // Shrink the page when the on-screen keyboard opens so the chat composer stays visible.
+  interactiveWidget: 'resizes-content',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#121215' },
+    { media: '(prefers-color-scheme: light)', color: '#fafafb' }
+  ]
 }
 
 export default function RootLayout({
   children
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${dmMono.variable} antialiased`}>
-        <NuqsAdapter>{children}</NuqsAdapter>
-        <Toaster />
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   )
