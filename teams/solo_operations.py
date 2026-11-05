@@ -9,7 +9,7 @@ from agents.copywriter import content_strategist
 from agents.researcher import market_researcher
 from agents.tech_specialist import tech_specialist
 from app.registry import shared_learning
-from app.settings import reasoning_model
+from app.settings import get_team_model, model_override_hook, reasoning_model
 from db import get_postgres_db
 
 INSTRUCTIONS = """\
@@ -30,7 +30,8 @@ How you work:
 solo_operations_team = Team(
     id="solo-chief-of-staff",
     name="Solo Chief of Staff",
-    model=reasoning_model(),
+    model=get_team_model("solo-chief-of-staff", reasoning_model),
+    pre_hooks=[model_override_hook],
     members=[market_researcher, content_strategist, tech_specialist],
     db=get_postgres_db(),
     learning=shared_learning,

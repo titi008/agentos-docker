@@ -61,12 +61,12 @@ class TestPricingManager(unittest.TestCase):
         )
         self.assertEqual(recalculated_past, 2.00)
 
-        # 4. New run after update on Nov 5 - must use new rate 3.50
+        # 4. New run after update - must use new rate 3.50
         future_cost = self.manager.calculate_cost(
             model_id="claude-sonnet-5-5",
             input_tokens=1_000_000,
             output_tokens=0,
-            timestamp_iso="2026-11-05T00:00:00Z",
+            timestamp_iso="2099-01-01T00:00:00Z",
         )
         self.assertEqual(future_cost, 3.50)
 

@@ -50,6 +50,32 @@ class TestEndpoints(unittest.TestCase):
         )
         self.assertEqual(res_patch.status_code, 200)
 
+    def test_update_team_model_endpoint(self) -> None:
+        # POST /api/teams/{team_id}/model
+        res = self.client.post(
+            "/api/teams/solo-chief-of-staff/model",
+            json={"model_id": "claude-sonnet-5-5"},
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["team_id"], "solo-chief-of-staff")
+        self.assertEqual(data["model_id"], "claude-sonnet-5-5")
+
+        # Fallback alias /teams/{team_id}/model
+        res_alias = self.client.post(
+            "/teams/solo-chief-of-staff/model",
+            json={"model_id": "claude-sonnet-5-5"},
+        )
+        self.assertEqual(res_alias.status_code, 200)
+
+        # PATCH method
+        res_patch = self.client.patch(
+            "/api/teams/solo-chief-of-staff/model",
+            json={"model_id": "claude-sonnet-5-5"},
+        )
+        self.assertEqual(res_patch.status_code, 200)
+
     def test_pricing_endpoints(self) -> None:
         # GET /api/pricing
         res = self.client.get("/api/pricing")

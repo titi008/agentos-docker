@@ -11,6 +11,7 @@ from agno.agent import Agent
 from agno.job_queue import QueueConfig
 from agno.os import AgentOS, CompanyConfig, OSManager
 from agno.os.config import CORSConfig
+from agno.team import Team
 from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
 
@@ -93,6 +94,30 @@ async def update_agent_model_endpoint(agent_id: str, payload: UpdateAgentModelPa
     return {
         "status": "success",
         "agent_id": agent_id,
+        "model_id": payload.model_id,
+        "provider": getattr(new_model, "provider", "Unknown"),
+        "updated_in_memory": found,
+    }
+
+
+@base_app.api_route("/teams/{team_id}/model", methods=["POST", "PATCH", "PUT"])
+@base_app.api_route("/api/teams/{team_id}/model", methods=["POST", "PATCH", "PUT"])
+async def update_team_model_endpoint(team_id: str, payload: UpdateAgentModelPayload) -> dict:
+    """Update and persist the leader model for an application team."""
+    new_model = model_from_id(payload.model_id)
+    save_agent_model_override(team_id, payload.model_id)
+
+    found = False
+    if agent_os.teams:
+        for t in agent_os.teams:
+            if isinstance(t, Team) and t.id == team_id:
+                t.model = new_model
+                found = True
+                break
+
+    return {
+        "status": "success",
+        "team_id": team_id,
         "model_id": payload.model_id,
         "provider": getattr(new_model, "provider", "Unknown"),
         "updated_in_memory": found,

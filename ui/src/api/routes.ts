@@ -119,5 +119,7 @@ export const APIRoutes = {
   // Models
   GetModels: (agentOSUrl: string) => `${agentOSUrl}/api/models`,
   UpdateAgentModel: (agentOSUrl: string, agentId: string) =>
-    `${agentOSUrl}/api/agents/${agentId}/model`
+    `${agentOSUrl}/api/agents/${agentId}/model`,
+  UpdateTeamModel: (agentOSUrl: string, teamId: string) =>
+    `${agentOSUrl}/api/teams/${teamId}/model`
 }

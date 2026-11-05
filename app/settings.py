@@ -52,27 +52,36 @@ def save_agent_model_override(agent_id: str, model_id: str) -> None:
 
 
 def get_agent_model(agent_id: str, default_factory: Any) -> Any:
-    """Resolve an agent's model, respecting saved Studio overrides."""
+    """Resolve an agent or team model, respecting saved Studio overrides."""
     overrides = get_agent_model_overrides()
     if agent_id in overrides:
         return model_from_id(overrides[agent_id])
     return default_factory()
 
 
-def model_override_hook(run_context: Any) -> None:
+get_team_model = get_agent_model
+
+
+def model_override_hook(
+    run_context: Any = None,
+    agent: Any = None,
+    team: Any = None,
+    **kwargs: Any,
+) -> None:
     """Pre-hook that checks for chat-level model overrides in session_state or metadata."""
+    target = agent or team or getattr(run_context, "agent", None) or getattr(run_context, "team", None)
     session_state = getattr(run_context, "session_state", None)
     if isinstance(session_state, dict):
         override = session_state.get("model_override")
-        if override and hasattr(run_context, "agent"):
-            run_context.agent.model = model_from_id(override)
+        if override and target:
+            target.model = model_from_id(override)
             return
 
     metadata = getattr(run_context, "metadata", None)
     if isinstance(metadata, dict):
         override = metadata.get("model_override")
-        if override and hasattr(run_context, "agent"):
-            run_context.agent.model = model_from_id(override)
+        if override and target:
+            target.model = model_from_id(override)
 
 
 def _resolve_provider(tier_env_prefix: str = "") -> str:

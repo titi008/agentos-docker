@@ -14,7 +14,8 @@ import {
   deleteComponentAPI,
   getRegistryAPI,
   getAvailableModelsAPI,
-  updateAgentModelAPI
+  updateAgentModelAPI,
+  updateTeamModelAPI
 } from '@/api/os'
 import {
   AgentDetails,
@@ -100,6 +101,8 @@ export const StudioView = () => {
     { id: 'gpt-6.1-sol', provider: 'OpenAI' }
   ])
   const [selectedTeamDetail, setSelectedTeamDetail] = useState<TeamDetails | null>(null)
+  const [selectedTeamModel, setSelectedTeamModel] = useState<string>('')
+  const [isUpdatingTeamModel, setIsUpdatingTeamModel] = useState<boolean>(false)
   const [selectedWorkflowDetail, setSelectedWorkflowDetail] = useState<WorkflowSummaryResponse | null>(null)
   const [selectedRegistryDetail, setSelectedRegistryDetail] = useState<RegistryContentResponse | null>(null)
 
@@ -108,6 +111,12 @@ export const StudioView = () => {
       setSelectedAgentModel(selectedAgentDetail.model?.model || '')
     }
   }, [selectedAgentDetail])
+
+  useEffect(() => {
+    if (selectedTeamDetail) {
+      setSelectedTeamModel(selectedTeamDetail.model?.model || '')
+    }
+  }, [selectedTeamDetail])
 
   useEffect(() => {
     let isMounted = true
@@ -1613,18 +1622,69 @@ export const StudioView = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                  Leader Model
-                </label>
-                <div className="mt-1 flex items-center gap-2 rounded-xl border border-primary/15 bg-accent/30 p-2.5">
-                  <span className="font-semibold text-foreground">
-                    {selectedTeamDetail.model?.provider || 'LLM'}
-                  </span>
-                  <span className="text-muted">•</span>
-                  <span className="text-muted font-mono">
-                    {selectedTeamDetail.model?.model || 'Default Model'}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                    Leader Model
+                  </label>
+                  {selectedTeamModel &&
+                    selectedTeamDetail.model?.model &&
+                    selectedTeamModel !== selectedTeamDetail.model.model && (
+                      <span className="text-[10px] font-medium text-amber-400">
+                        Unsaved change
+                      </span>
+                    )}
                 </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <select
+                    value={selectedTeamModel}
+                    onChange={(e) => setSelectedTeamModel(e.target.value)}
+                    className="h-9 flex-1 rounded-xl border border-primary/20 bg-accent/40 px-3 text-xs text-foreground focus:border-primary focus:outline-none"
+                  >
+                    {availableModels.map((m) => (
+                      <option key={m.id} value={m.id} className="bg-background text-foreground">
+                        {m.id} ({m.provider})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={
+                      isUpdatingTeamModel ||
+                      !selectedTeamModel ||
+                      selectedTeamModel === selectedTeamDetail.model?.model
+                    }
+                    onClick={async () => {
+                      setIsUpdatingTeamModel(true)
+                      const success = await updateTeamModelAPI(
+                        selectedEndpoint,
+                        selectedTeamDetail.id,
+                        selectedTeamModel,
+                        authToken
+                      )
+                      setIsUpdatingTeamModel(false)
+                      if (success) {
+                        const matchedProvider =
+                          availableModels.find((m) => m.id === selectedTeamModel)
+                            ?.provider || 'Unknown'
+                        setSelectedTeamDetail({
+                          ...selectedTeamDetail,
+                          model: {
+                            name: selectedTeamModel,
+                            model: selectedTeamModel,
+                            provider: matchedProvider
+                          }
+                        })
+                        refreshAll()
+                      }
+                    }}
+                    className="h-9 rounded-xl bg-primary px-3 text-xs font-semibold text-background hover:bg-primary/90 disabled:opacity-40"
+                  >
+                    {isUpdatingTeamModel ? 'Updating...' : 'Update Model'}
+                  </button>
+                </div>
+                <p className="mt-1 text-[10px] text-muted">
+                  Persists across server restarts in <code className="text-foreground">data/agent_model_overrides.json</code>.
+                </p>
               </div>
 
               <div>

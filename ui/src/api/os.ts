@@ -443,6 +443,39 @@ export const updateAgentModelAPI = async (
   }
 }
 
+export const updateTeamModelAPI = async (
+  endpoint: string,
+  teamId: string,
+  modelId: string,
+  authToken?: string
+): Promise<boolean> => {
+  try {
+    let response = await fetch(APIRoutes.UpdateTeamModel(endpoint, teamId), {
+      method: 'POST',
+      headers: createHeaders(authToken),
+      body: JSON.stringify({ model_id: modelId })
+    })
+    if (response.status === 404) {
+      response = await fetch(`${endpoint}/teams/${teamId}/model`, {
+        method: 'POST',
+        headers: createHeaders(authToken),
+        body: JSON.stringify({ model_id: modelId })
+      })
+    }
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      toast.error(`Failed to update team model (${response.status}): ${errText || response.statusText}`)
+      return false
+    }
+    toast.success(`Team leader model updated to ${modelId}`)
+    return true
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error'
+    toast.error(`Error updating team model: ${msg}`)
+    return false
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Memory & Learnings
 // ---------------------------------------------------------------------------
