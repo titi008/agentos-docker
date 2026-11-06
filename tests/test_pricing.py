@@ -1,12 +1,16 @@
 """Unit tests for the model pricing and cost tracking engine."""
 
 import json
-import tempfile
 import unittest
 import uuid
-from pathlib import Path
+from datetime import datetime
+from unittest import mock
+
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from app.pricing import (
+    DEFAULT_PRICE_BOOK,
+    PriceRateStore,
     PricingManager,
     RunUsageRow,
     aggregate_costs,
@@ -21,12 +25,7 @@ OCT_16_NOON = 1_792_152_000
 
 class TestPricingManager(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.storage_file = Path(self.temp_dir.name) / "pricing_history.json"
-        self.manager = PricingManager(storage_path=self.storage_file)
-
-    def tearDown(self) -> None:
-        self.temp_dir.cleanup()
+        self.manager = PricingManager()
 
     def test_default_rates_loaded(self) -> None:
         rates = self.manager.get_current_rates()
@@ -101,11 +100,7 @@ def _details(*models: tuple[str, str, str, int, int]) -> dict:
 
 class TestCostAggregation(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.manager = PricingManager(storage_path=Path(self.temp_dir.name) / "pricing_history.json")
-
-    def tearDown(self) -> None:
-        self.temp_dir.cleanup()
+        self.manager = PricingManager()
 
     def test_breakdown_schema_without_runs(self) -> None:
         breakdown = aggregate_costs([], self.manager)
@@ -381,13 +376,65 @@ class TestLoadRunUsage(unittest.TestCase):
         rows = load_run_usage(self.db)
         self.assertEqual(len(rows), 4)
 
-        with tempfile.TemporaryDirectory() as pricing_dir:
-            manager = PricingManager(storage_path=Path(pricing_dir) / "pricing_history.json")
-            breakdown = aggregate_costs(rows, manager)
+        breakdown = aggregate_costs(rows, PricingManager())
         self.assertEqual(breakdown["total_runs"], 3)  # agent, team and legacy runs; the member run is the team's
         self.assertEqual(breakdown["total_input_tokens"], 2_110_000)
         # Sonnet 2.00 + 1.00 (agent) + 0.02 + 0.01 (team leader), Flash 0.075 (member), GPT 1.50 (legacy)
         self.assertAlmostEqual(breakdown["total_cost"], 4.605, places=4)
+
+
+class TestPriceRateStore(unittest.TestCase):
+    """Price changes are saved in PostgreSQL, in a throwaway schema of the local database."""
+
+    def setUp(self) -> None:
+        from agno.db.postgres import PostgresDb
+        from sqlalchemy import text
+
+        from db.url import db_url
+
+        self.schema = f"price_test_{uuid.uuid4().hex[:10]}"
+        self.db = PostgresDb(id=f"price-test-{self.schema}", db_url=db_url, db_schema=self.schema)
+        self.text = text
+        try:
+            with self.db.db_engine.connect() as conn:
+                conn.execute(text("select 1"))
+        except OperationalError as exc:
+            self.skipTest(f"PostgreSQL is not reachable: {exc}")
+
+    def tearDown(self) -> None:
+        with self.db.db_engine.begin() as conn:
+            conn.execute(self.text(f'DROP SCHEMA IF EXISTS "{self.schema}" CASCADE'))
+        self.db.db_engine.dispose()
+
+    def test_changes_survive_a_restart(self) -> None:
+        manager = PricingManager(store=PriceRateStore(self.db))
+        self.assertEqual(len(manager.get_rates()), len(DEFAULT_PRICE_BOOK))
+        rate = manager.update_rate("claude-sonnet-5-5", input_cost_per_m=3.5, output_cost_per_m=15.0)
+
+        # A new manager and store stand in for the API after a redeploy.
+        restarted = PricingManager(store=PriceRateStore(self.db))
+        history = restarted.get_rates()
+        self.assertEqual(len(history), len(DEFAULT_PRICE_BOOK) + 1)
+        saved = history[-1]
+        self.assertEqual(
+            (saved.model_id, saved.provider, saved.input_cost_per_m, saved.output_cost_per_m),
+            ("claude-sonnet-5-5", "Anthropic", 3.5, 15.0),
+        )
+        self.assertEqual(datetime.fromisoformat(saved.effective_from), datetime.fromisoformat(rate.effective_from))
+        current = {r.model_id: r for r in restarted.get_current_rates()}
+        self.assertEqual(current["claude-sonnet-5-5"].input_cost_per_m, 3.5)
+        # Runs before the change keep the old price.
+        past = restarted.calculate_cost("claude-sonnet-5-5", 1_000_000, 0, "2026-10-10T12:00:00Z")
+        self.assertEqual(past, 2.0)
+
+    def test_failed_save_changes_nothing(self) -> None:
+        store = PriceRateStore(self.db)
+        manager = PricingManager(store=store)
+        failure = OperationalError("INSERT", {}, Exception("database is down"))
+        with mock.patch.object(store, "add", side_effect=failure), self.assertRaises(SQLAlchemyError):
+            manager.update_rate("claude-sonnet-5-5", input_cost_per_m=3.5, output_cost_per_m=15.0)
+        self.assertEqual(len(manager.get_rates()), len(DEFAULT_PRICE_BOOK))
+        self.assertEqual(len(PricingManager(store=PriceRateStore(self.db)).get_rates()), len(DEFAULT_PRICE_BOOK))
 
 
 if __name__ == "__main__":

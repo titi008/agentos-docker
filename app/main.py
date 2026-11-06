@@ -6,6 +6,7 @@ AgentOS Entrypoint
 from collections.abc import Awaitable, Callable
 from os import getenv
 from pathlib import Path
+from typing import Any
 
 from agno.agent import Agent
 from agno.job_queue import QueueConfig
@@ -13,7 +14,7 @@ from agno.os import AgentOS, CompanyConfig, OSManager
 from agno.os.config import CORSConfig
 from agno.team import Team
 from fastapi import FastAPI, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
 from agents.copywriter import content_strategist
@@ -70,6 +71,23 @@ class UpdateAgentModelPayload(BaseModel):
     model_id: str
 
 
+def _palette_model(model_id: str) -> Any:
+    """Return a model for an ID from the /api/models palette, or answer 422."""
+    if model_id not in {m.id for m in get_available_models()}:
+        raise HTTPException(status_code=422, detail=f"Unknown model {model_id!r}. Choose one listed by /api/models.")
+    return model_from_id(model_id)
+
+
+def _save_model_choice(component_id: str, model_id: str) -> None:
+    """Save a model choice in the database, or answer 503."""
+    try:
+        save_agent_model_override(component_id, model_id)
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503, detail="The model couldn't be saved: the database is unavailable."
+        ) from exc
+
+
 @base_app.get("/api/models")
 async def get_available_models_endpoint() -> list[dict]:
     """Return palette of supported models for the UI."""
@@ -77,81 +95,85 @@ async def get_available_models_endpoint() -> list[dict]:
     return [{"id": m.id, "provider": getattr(m, "provider", "Unknown")} for m in models]
 
 
+# The model and pricing routes are sync so their database calls run in FastAPI's
+# threadpool instead of blocking the event loop.
 @base_app.api_route("/agents/{agent_id}/model", methods=["POST", "PATCH", "PUT"])
 @base_app.api_route("/api/agents/{agent_id}/model", methods=["POST", "PATCH", "PUT"])
-async def update_agent_model_endpoint(agent_id: str, payload: UpdateAgentModelPayload) -> dict:
-    """Update and persist the model for an application agent."""
-    new_model = model_from_id(payload.model_id)
-    save_agent_model_override(agent_id, payload.model_id)
-
-    found = False
-    if agent_os.agents:
-        for a in agent_os.agents:
-            if isinstance(a, Agent) and a.id == agent_id:
-                a.model = new_model
-                found = True
-                break
+def update_agent_model_endpoint(agent_id: str, payload: UpdateAgentModelPayload) -> dict:
+    """Change the model of a code-defined agent and save it, so redeploys keep it."""
+    agent = next((a for a in agent_os.agents or [] if isinstance(a, Agent) and a.id == agent_id), None)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"No code-defined agent has the id {agent_id!r}.")
+    new_model = _palette_model(payload.model_id)
+    _save_model_choice(agent_id, payload.model_id)
+    agent.model = new_model
 
     return {
         "status": "success",
         "agent_id": agent_id,
         "model_id": payload.model_id,
         "provider": getattr(new_model, "provider", "Unknown"),
-        "updated_in_memory": found,
+        "updated_in_memory": True,
     }
 
 
 @base_app.api_route("/teams/{team_id}/model", methods=["POST", "PATCH", "PUT"])
 @base_app.api_route("/api/teams/{team_id}/model", methods=["POST", "PATCH", "PUT"])
-async def update_team_model_endpoint(team_id: str, payload: UpdateAgentModelPayload) -> dict:
-    """Update and persist the leader model for an application team."""
-    new_model = model_from_id(payload.model_id)
-    save_agent_model_override(team_id, payload.model_id)
-
-    found = False
-    if agent_os.teams:
-        for t in agent_os.teams:
-            if isinstance(t, Team) and t.id == team_id:
-                t.model = new_model
-                found = True
-                break
+def update_team_model_endpoint(team_id: str, payload: UpdateAgentModelPayload) -> dict:
+    """Change the leader model of a code-defined team and save it, so redeploys keep it."""
+    team = next((t for t in agent_os.teams or [] if isinstance(t, Team) and t.id == team_id), None)
+    if team is None:
+        raise HTTPException(status_code=404, detail=f"No code-defined team has the id {team_id!r}.")
+    new_model = _palette_model(payload.model_id)
+    _save_model_choice(team_id, payload.model_id)
+    team.model = new_model
 
     return {
         "status": "success",
         "team_id": team_id,
         "model_id": payload.model_id,
         "provider": getattr(new_model, "provider", "Unknown"),
-        "updated_in_memory": found,
+        "updated_in_memory": True,
     }
 
 
 class UpdatePriceRequest(BaseModel):
-    model_id: str
-    input_cost_per_m: float
-    output_cost_per_m: float
-    provider: str | None = None
+    model_id: str = Field(min_length=1, max_length=200)
+    input_cost_per_m: float = Field(ge=0, allow_inf_nan=False)
+    output_cost_per_m: float = Field(ge=0, allow_inf_nan=False)
+    provider: str | None = Field(default=None, max_length=100)
 
 
 @base_app.get("/pricing")
 @base_app.get("/api/pricing")
-async def get_pricing() -> dict:
+def get_pricing() -> dict:
     """Return active model rates and rate change history."""
+    try:
+        current_rates = pricing_manager.get_current_rates()
+        history = pricing_manager.get_rates()
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Pricing is unavailable: the database could not be read.") from exc
     return {
-        "current_rates": [r.to_dict() for r in pricing_manager.get_current_rates()],
-        "history": [r.to_dict() for r in pricing_manager.get_rates()],
+        "current_rates": [r.to_dict() for r in current_rates],
+        "history": [r.to_dict() for r in history],
     }
 
 
 @base_app.post("/pricing")
 @base_app.post("/api/pricing")
-async def update_pricing(payload: UpdatePriceRequest) -> dict:
+def update_pricing(payload: UpdatePriceRequest) -> dict:
     """Update pricing for a model effective immediately, leaving past runs unchanged."""
-    rate = pricing_manager.update_rate(
-        model_id=payload.model_id,
-        input_cost_per_m=payload.input_cost_per_m,
-        output_cost_per_m=payload.output_cost_per_m,
-        provider=payload.provider,
-    )
+    try:
+        rate = pricing_manager.update_rate(
+            model_id=payload.model_id,
+            input_cost_per_m=payload.input_cost_per_m,
+            output_cost_per_m=payload.output_cost_per_m,
+            provider=payload.provider,
+        )
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503, detail="The price couldn't be saved: the database is unavailable."
+        ) from exc
     return {"status": "success", "rate": rate.to_dict()}
 
 

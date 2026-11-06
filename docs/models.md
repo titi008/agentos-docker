@@ -76,7 +76,7 @@ Import the semantic tier factories in your agent and team definitions:
 
 ### Option C: Agno Studio UI
 
-The model selection palette exposed in the Studio UI is configured in [`app/settings.py:get_available_models()`](../app/settings.py). Agents and teams created dynamically in Studio can select any model from this palette; changes persist directly to PostgreSQL.
+The model selection palette exposed in the Studio UI is configured in [`app/settings.py:get_available_models()`](../app/settings.py). Agents and teams created dynamically in Studio can select any model from this palette; changes persist directly to PostgreSQL. Model changes for the code-defined agents and teams are saved in the `app_model_overrides` table of the same database, and price changes in `app_price_rates`, so restarts and redeploys keep them.
 
 ---
 

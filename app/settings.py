@@ -5,16 +5,23 @@ App Settings
 Shared runtime objects for the platform.
 """
 
-import json
+from functools import cache
 from os import getenv
-from pathlib import Path
 from typing import Any
 
+from agno.db.postgres import PostgresDb
 from agno.models.anthropic import Claude
 from agno.models.google import Gemini
 from agno.models.openai import OpenAIResponses
+from agno.utils.log import log_error
+from sqlalchemy import Column, Connection, DateTime, MetaData, String, Table, func, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import SQLAlchemyError
 
-OVERRIDES_PATH = Path(__file__).resolve().parent.parent / "data" / "agent_model_overrides.json"
+from db import get_postgres_db
+from db.tables import ensure_table
+
+MODEL_OVERRIDES_TABLE = "app_model_overrides"
 
 
 def model_from_id(model_id: str) -> Any:
@@ -27,36 +34,76 @@ def model_from_id(model_id: str) -> Any:
     return OpenAIResponses(id=model_id)
 
 
+class ModelOverrideStore:
+    """Models chosen in Studio for code-defined agents and teams.
+
+    Kept in the shared PostgreSQL database, so restarts and redeploys keep them.
+    """
+
+    def __init__(self, db: PostgresDb) -> None:
+        self._engine = db.db_engine
+        self._table = Table(
+            MODEL_OVERRIDES_TABLE,
+            MetaData(schema=db.db_schema),
+            Column("component_id", String, primary_key=True),
+            Column("model_id", String, nullable=False),
+            Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+        )
+        self._table_ready = False
+        self._cache: dict[str, str] | None = None
+
+    def _prepare(self, conn: Connection) -> None:
+        if not self._table_ready:
+            ensure_table(conn, self._table)
+            self._table_ready = True
+
+    def load(self) -> dict[str, str]:
+        """Return the saved model ID for each agent or team ID."""
+        if self._cache is None:
+            with self._engine.begin() as conn:
+                self._prepare(conn)
+                rows = conn.execute(select(self._table.c.component_id, self._table.c.model_id)).all()
+            self._cache = {component_id: model_id for component_id, model_id in rows}
+        return dict(self._cache)
+
+    def save(self, component_id: str, model_id: str) -> None:
+        """Save the model for an agent or team. Raises SQLAlchemyError if the write fails."""
+        statement = insert(self._table).values(component_id=component_id, model_id=model_id)
+        statement = statement.on_conflict_do_update(
+            index_elements=[self._table.c.component_id],
+            set_={"model_id": statement.excluded.model_id, "updated_at": func.now()},
+        )
+        with self._engine.begin() as conn:
+            self._prepare(conn)
+            conn.execute(statement)
+        if self._cache is not None:
+            self._cache[component_id] = model_id
+
+
+@cache
+def model_override_store() -> ModelOverrideStore:
+    """The store for the shared AgentOS database."""
+    return ModelOverrideStore(get_postgres_db())
+
+
 def get_agent_model_overrides() -> dict[str, str]:
-    """Load persistent model overrides for code-defined agents."""
-    if not OVERRIDES_PATH.exists():
-        return {}
-    try:
-        with open(OVERRIDES_PATH, encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
+    """Saved model IDs for code-defined agents and teams. Raises SQLAlchemyError if unreadable."""
+    return model_override_store().load()
 
 
-def save_agent_model_override(agent_id: str, model_id: str) -> None:
-    """Save persistent model override for a code-defined agent."""
-    overrides = get_agent_model_overrides()
-    overrides[agent_id] = model_id
-    try:
-        OVERRIDES_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(OVERRIDES_PATH, "w", encoding="utf-8") as f:
-            json.dump(overrides, f, indent=2)
-    except Exception:
-        pass
+def save_agent_model_override(component_id: str, model_id: str) -> None:
+    """Save the model for a code-defined agent or team. Raises SQLAlchemyError if the write fails."""
+    model_override_store().save(component_id, model_id)
 
 
 def get_agent_model(agent_id: str, default_factory: Any) -> Any:
-    """Resolve an agent or team model, respecting saved Studio overrides."""
-    overrides = get_agent_model_overrides()
-    if agent_id in overrides:
-        return model_from_id(overrides[agent_id])
-    return default_factory()
+    """Resolve an agent or team model, using the model saved in Studio if there is one."""
+    try:
+        model_id = get_agent_model_overrides().get(agent_id)
+    except SQLAlchemyError as exc:
+        log_error(f"Couldn't read saved models, so {agent_id} uses its default model: {exc}")
+        model_id = None
+    return model_from_id(model_id) if model_id else default_factory()
 
 
 get_team_model = get_agent_model

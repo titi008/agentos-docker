@@ -11,16 +11,35 @@ import json
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from agno.db.postgres import PostgresDb
 from agno.utils.log import log_error
-from sqlalchemy import case, cast, column, exists, func, inspect, select, table
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Connection,
+    DateTime,
+    Float,
+    Identity,
+    MetaData,
+    String,
+    Table,
+    case,
+    cast,
+    column,
+    exists,
+    func,
+    insert,
+    inspect,
+    select,
+    table,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
 from db import get_postgres_db
+from db.tables import ensure_table
 
 
 @dataclass
@@ -111,45 +130,94 @@ DEFAULT_PRICE_BOOK: list[PriceRate] = [
 ]
 
 
+PRICE_RATES_TABLE = "app_price_rates"
+
+
+class PriceRateStore:
+    """Price changes made in the UI, kept in the shared PostgreSQL database.
+
+    Restarts and redeploys keep them. The default price book stays in code.
+    """
+
+    def __init__(self, db: PostgresDb) -> None:
+        self._engine = db.db_engine
+        self._table = Table(
+            PRICE_RATES_TABLE,
+            MetaData(schema=db.db_schema),
+            Column("id", BigInteger, Identity(), primary_key=True),
+            Column("model_id", String, nullable=False),
+            Column("provider", String, nullable=False),
+            Column("input_cost_per_m", Float, nullable=False),
+            Column("output_cost_per_m", Float, nullable=False),
+            Column("effective_from", DateTime(timezone=True), nullable=False),
+        )
+        self._table_ready = False
+
+    def _prepare(self, conn: Connection) -> None:
+        if not self._table_ready:
+            ensure_table(conn, self._table)
+            self._table_ready = True
+
+    def load(self) -> list[PriceRate]:
+        """Return saved rate changes, oldest first. Raises SQLAlchemyError if unreadable."""
+        columns = self._table.c
+        query = select(
+            columns.model_id,
+            columns.provider,
+            columns.input_cost_per_m,
+            columns.output_cost_per_m,
+            columns.effective_from,
+        ).order_by(columns.effective_from, columns.id)
+        with self._engine.begin() as conn:
+            self._prepare(conn)
+            rows = conn.execute(query).all()
+        return [
+            PriceRate(
+                model_id=row.model_id,
+                provider=row.provider,
+                input_cost_per_m=row.input_cost_per_m,
+                output_cost_per_m=row.output_cost_per_m,
+                effective_from=row.effective_from.astimezone(UTC).isoformat(),
+            )
+            for row in rows
+        ]
+
+    def add(self, rate: PriceRate) -> None:
+        """Save a rate change. Raises SQLAlchemyError if the write fails."""
+        with self._engine.begin() as conn:
+            self._prepare(conn)
+            conn.execute(
+                insert(self._table).values(
+                    model_id=rate.model_id,
+                    provider=rate.provider,
+                    input_cost_per_m=rate.input_cost_per_m,
+                    output_cost_per_m=rate.output_cost_per_m,
+                    effective_from=datetime.fromisoformat(rate.effective_from),
+                )
+            )
+
+
 class PricingManager:
-    """Manages effective-dated model pricing and calculates token costs."""
+    """Manages effective-dated model pricing and calculates token costs.
 
-    def __init__(self, storage_path: Path | None = None) -> None:
-        self.storage_path = storage_path or Path(__file__).resolve().parent.parent / "data" / "pricing_history.json"
-        self._rates: list[PriceRate] = []
-        self._load_rates()
+    Rates are the default price book plus changes saved in ``store``. Without a
+    store, changes are kept in memory only.
+    """
 
-    def _load_rates(self) -> None:
-        """Load rates from storage, populating defaults if empty."""
-        loaded: list[PriceRate] = []
-        if self.storage_path.exists():
-            try:
-                with open(self.storage_path, encoding="utf-8") as f:
-                    raw_list = json.load(f)
-                    if isinstance(raw_list, list):
-                        loaded = [PriceRate.from_dict(item) for item in raw_list]
-            except Exception:
-                loaded = []
+    def __init__(self, store: PriceRateStore | None = None) -> None:
+        self._store = store
+        self._saved: list[PriceRate] | None = None if store else []
 
-        if not loaded:
-            loaded = list(DEFAULT_PRICE_BOOK)
-            self._save_rates(loaded)
-
-        self._rates = loaded
-
-    def _save_rates(self, rates: list[PriceRate]) -> None:
-        """Persist rate history to storage file."""
-        try:
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.storage_path, "w", encoding="utf-8") as f:
-                json.dump([r.to_dict() for r in rates], f, indent=2)
-        except Exception:
-            # Fall back to in-memory state if disk writes are restricted
-            pass
+    def _saved_rates(self) -> list[PriceRate]:
+        """Rate changes, loaded from the store on first use."""
+        if self._saved is None:
+            assert self._store is not None
+            self._saved = self._store.load()
+        return self._saved
 
     def get_rates(self) -> list[PriceRate]:
-        """Return full rate history sorted by effective date."""
-        return list(self._rates)
+        """Return the default rates followed by saved changes."""
+        return [*DEFAULT_PRICE_BOOK, *self._saved_rates()]
 
     def get_current_rates(self) -> list[PriceRate]:
         """Return the latest active rate for each known model."""
@@ -157,7 +225,7 @@ class PricingManager:
         latest_by_model: dict[str, PriceRate] = {}
 
         # Sort chronologically
-        sorted_rates = sorted(self._rates, key=lambda r: r.effective_from)
+        sorted_rates = sorted(self.get_rates(), key=lambda r: r.effective_from)
         for rate in sorted_rates:
             if rate.effective_from <= now_iso:
                 latest_by_model[rate.model_id] = rate
@@ -167,12 +235,16 @@ class PricingManager:
     def update_rate(
         self, model_id: str, input_cost_per_m: float, output_cost_per_m: float, provider: str | None = None
     ) -> PriceRate:
-        """Add a new rate version effective immediately, leaving past runs immutable."""
+        """Add a new rate version effective immediately, leaving past runs immutable.
+
+        Raises SQLAlchemyError if the store can't save it.
+        """
         now_iso = datetime.now(UTC).isoformat()
+        saved = self._saved_rates()
 
         # Determine provider if omitted
         if not provider:
-            for r in reversed(self._rates):
+            for r in reversed(self.get_rates()):
                 if r.model_id == model_id:
                     provider = r.provider
                     break
@@ -187,15 +259,17 @@ class PricingManager:
             effective_from=now_iso,
         )
 
-        self._rates.append(new_rate)
-        self._save_rates(self._rates)
+        if self._store is not None:
+            self._store.add(new_rate)
+        saved.append(new_rate)
         return new_rate
 
     def get_rate_for_timestamp(self, model_id: str, timestamp_iso: str | None = None) -> PriceRate | None:
         """Find the rate for a model effective at the specified point in time."""
         target_ts = timestamp_iso or datetime.now(UTC).isoformat()
+        rates = self.get_rates()
 
-        matching_rates = [r for r in self._rates if r.model_id == model_id and r.effective_from <= target_ts]
+        matching_rates = [r for r in rates if r.model_id == model_id and r.effective_from <= target_ts]
 
         if matching_rates:
             matching_rates.sort(key=lambda r: r.effective_from, reverse=True)
@@ -203,7 +277,7 @@ class PricingManager:
 
         # Fuzzy match for provider prefixes e.g. "google/gemini-3.8-flash"
         clean_model_id = model_id.split("/")[-1].split(":")[-1]
-        fallback_matches = [r for r in self._rates if r.model_id == clean_model_id and r.effective_from <= target_ts]
+        fallback_matches = [r for r in rates if r.model_id == clean_model_id and r.effective_from <= target_ts]
         if fallback_matches:
             fallback_matches.sort(key=lambda r: r.effective_from, reverse=True)
             return fallback_matches[0]
@@ -223,8 +297,8 @@ class PricingManager:
         return round(in_cost + out_cost, 6)
 
 
-# Shared global pricing manager
-pricing_manager = PricingManager()
+# Shared pricing manager; rate changes are saved in the AgentOS database.
+pricing_manager = PricingManager(store=PriceRateStore(get_postgres_db()))
 
 
 # ---------------------------------------------------------------------------
