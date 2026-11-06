@@ -16,6 +16,29 @@ generic manager behavior belongs in Agno. `CLAUDE.md` links to this file.
 - Keep the starter lean. Add abstractions, tests and infrastructure only for a concrete
   application need. Never print or commit credentials.
 
+## Public repository
+
+This repository is public. Anyone can read every commit, including old versions of
+files and commit metadata, and a later fix does not remove what history already holds.
+These rules apply to code, docs, comments, examples, tests, fixtures and commit messages.
+
+- Never commit secrets: API keys, tokens, passwords, private or signing keys,
+  connection strings with credentials, or `.env` files. Docs and examples use
+  placeholders such as `sk-...` or `generate_a_secure_password`.
+- Never commit personal or confidential details: names, email addresses, real
+  domains, server addresses, account or resource IDs (Cloudflare, Coolify, cloud
+  providers), customer data, or chat, log and database exports. Use placeholders
+  such as `you@example.com` and `agentos.yourdomain.com`.
+- Never commit local machine paths (`/Users/...`, `/home/...`, `file://` links) or
+  machine-specific settings. Link to files with repository-relative paths.
+- Keep keys, generated settings, local notes and test output in ignored locations
+  such as `tmp/`. Check with `git check-ignore` before writing anything sensitive
+  inside the repository, and keep it out of Docker build contexts too.
+- Review the staged diff for all of the above before every commit. If something
+  sensitive was already pushed, stop and tell the user: the secret must be rotated,
+  and removing it from history needs a rewrite and force-push that only the user
+  can approve.
+
 ## Workflows
 
 Read the relevant local skill before starting. Slash commands refer to coding-agent

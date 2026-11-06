@@ -20,7 +20,7 @@ AgentOS organizes models into three semantic tiers:
 
 ## 2. Configuration Guide
 
-Model tiering is centralized in [`app/settings.py`](file:///Users/tiborszucs/My_files/Programming/Github/agno-integration/app/settings.py) and can be configured through environment variables, Python code, or the Studio UI.
+Model tiering is centralized in [`app/settings.py`](../app/settings.py) and can be configured through environment variables, Python code, or the Studio UI.
 
 ### Option A: Environment Variables (`.env`)
 
@@ -47,7 +47,7 @@ OPENAI_FAST_MODEL=gpt-6.1-sol
 
 Import the semantic tier factories in your agent and team definitions:
 
-* **Specialist Agent** ([`agents/researcher.py`](file:///Users/tiborszucs/My_files/Programming/Github/agno-integration/agents/researcher.py)):
+* **Specialist Agent** ([`agents/researcher.py`](../agents/researcher.py)):
   ```python
   from agno.agent import Agent
   from app.settings import fast_model
@@ -60,7 +60,7 @@ Import the semantic tier factories in your agent and team definitions:
   )
   ```
 
-* **Team Leader** ([`teams/solo_operations.py`](file:///Users/tiborszucs/My_files/Programming/Github/agno-integration/teams/solo_operations.py)):
+* **Team Leader** ([`teams/solo_operations.py`](../teams/solo_operations.py)):
   ```python
   from agno.team import Team
   from app.settings import reasoning_model
@@ -76,7 +76,7 @@ Import the semantic tier factories in your agent and team definitions:
 
 ### Option C: Agno Studio UI
 
-The model selection palette exposed in the Studio UI is configured in [`app/settings.py:get_available_models()`](file:///Users/tiborszucs/My_files/Programming/Github/agno-integration/app/settings.py). Agents and teams created dynamically in Studio can select any model from this palette; changes persist directly to PostgreSQL.
+The model selection palette exposed in the Studio UI is configured in [`app/settings.py:get_available_models()`](../app/settings.py). Agents and teams created dynamically in Studio can select any model from this palette; changes persist directly to PostgreSQL.
 
 ---
 
@@ -200,7 +200,7 @@ def execute_subtask(task: str, cost_preference: str = "reasoning") -> str:
 
 ## 6. Model Usage Cost Tracking & Effective-Dated Pricing
 
-AgentOS includes a built-in token cost estimation and pricing engine ([`app/pricing.py`](file:///Users/tiborszucs/My_files/Programming/Github/agno-integration/app/pricing.py)):
+AgentOS includes a built-in token cost estimation and pricing engine ([`app/pricing.py`](../app/pricing.py)):
 
 ### Effective-Dated Immutability
 When token rates change, historical cost records must remain accurate. The pricing engine enforces this through point-in-time timestamp matching:

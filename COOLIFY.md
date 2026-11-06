@@ -36,11 +36,11 @@ This guide walks you through deploying your self-hosted **Agno AgentOS** instanc
 1. In the application view under **Configuration**:
    - For **`agentos-api`**, set Domain to your API domain (port `8000`):
      ```text
-     https://agentos.lasttokens.dev:8000
+     https://agentos.yourdomain.com:8000
      ```
    - For **`agentos-ui`**, set Domain to your Chat UI domain (port `3000`):
      ```text
-     https://chat.lasttokens.dev:3000
+     https://chat.yourdomain.com:3000
      ```
 2. Coolify handles Traefik reverse proxy routing and Let's Encrypt SSL certificates automatically for both domains.
 
