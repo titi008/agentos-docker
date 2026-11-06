@@ -69,6 +69,13 @@ services:
     environment:
       PORT: 3000
       NEXT_PUBLIC_API_URL: ${AGENTOS_URL:-}
+      # Cloudflare Access sign-in (ui/README.md). Leave all empty to enter a token in Settings.
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
+      AGENTOS_TOKEN_SIGNING_KEY: ${AGENTOS_TOKEN_SIGNING_KEY:-}
+      AGENTOS_ADMIN_EMAILS: ${AGENTOS_ADMIN_EMAILS:-}
+      AGENTOS_USER_IDS: ${AGENTOS_USER_IDS:-}
+      AGENTOS_MEMBER_SCOPES: ${AGENTOS_MEMBER_SCOPES:-}
     depends_on:
       - agentos-api
     networks:

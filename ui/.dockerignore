@@ -4,7 +4,9 @@ node_modules
 out
 coverage
 
-# Local-only files
+# Local-only files (signing keys must never be baked into the image)
+.keys
+**/*.pem
 .git
 .github
 .vscode

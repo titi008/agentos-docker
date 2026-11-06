@@ -34,6 +34,7 @@ aienv*
 tmp/
 .claude/
 .codex/
+scripts/coolify-auth-env.mjs
 
 # Node (local deploy-tooling installs — not part of the image)
 node_modules

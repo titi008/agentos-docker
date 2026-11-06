@@ -1,12 +1,17 @@
 'use client'
 
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, LogOut, ShieldCheck } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useRouter } from 'next/navigation'
 import { useState, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 
-import { apiRequest, getErrorMessage, normalizeEndpoint } from '@/api/client'
+import {
+  apiRequest,
+  getErrorMessage,
+  normalizeEndpoint,
+  useApi
+} from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/data'
@@ -14,7 +19,11 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { PageBody, PageHeader, PageScroll } from '@/components/ui/page'
 import { SegmentedControl } from '@/components/ui/segmented'
-import { useIdentityQuery } from '@/features/workspace/queries'
+import {
+  useIdentityQuery,
+  useRuntimeConfigQuery,
+  useSessionTokenQuery
+} from '@/features/workspace/queries'
 import { isValidUrl } from '@/lib/utils'
 import { DEFAULT_ENDPOINT, useStore } from '@/store'
 
@@ -53,7 +62,7 @@ function ConnectionSection() {
   const serverDefault = useStore((state) => state.serverDefaultEndpoint)
   const saveEndpoint = useStore((state) => state.saveEndpoint)
   const resetEndpoint = useStore((state) => state.resetEndpoint)
-  const authToken = useStore((state) => state.authToken)
+  const { authToken } = useApi().ctx
   const active = useStore((state) => state.isEndpointActive)
   const loading = useStore((state) => state.isEndpointLoading)
   const setMessages = useStore((state) => state.setMessages)
@@ -278,10 +287,58 @@ function TokenSection() {
   )
 }
 
+/** Shown instead of the token field when this UI signs people in through Cloudflare Access. */
+function SignInSection() {
+  const token = useSessionTokenQuery(true)
+  const person = token.data
+
+  return (
+    <Section
+      title="Sign-in"
+      description="You sign in through Cloudflare Access. This UI then gives AgentOS a short-lived token for every request."
+    >
+      {person ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[13px] break-all">{person.email}</span>
+            <span className="text-xs text-fg-3">
+              {person.is_admin
+                ? 'Admin: full access, including the job queue'
+                : 'Member: run, read and edit; no deletes or admin pages'}
+            </span>
+          </div>
+          <Badge tone={person.is_admin ? 'ok' : 'neutral'}>
+            {person.is_admin ? 'Admin' : 'Member'}
+          </Badge>
+        </div>
+      ) : token.isError ? (
+        <p className="text-[13px] text-bad">{token.error.message}</p>
+      ) : (
+        <p className="text-[13px] text-fg-3">Checking your sign-in…</p>
+      )}
+      <p className="text-[13px] text-fg-3">
+        Tokens last 15 minutes and renew on their own; none is saved in this
+        browser. Admins are listed in AGENTOS_ADMIN_EMAILS on the UI server.
+      </p>
+      <div>
+        {/* Cloudflare's logout ends the Access session for this app. */}
+        <Button variant="secondary" asChild>
+          <a href="/cdn-cgi/access/logout">
+            <LogOut />
+            Sign out
+          </a>
+        </Button>
+      </div>
+    </Section>
+  )
+}
+
 function IdentitySection() {
   const userId = useStore((state) => state.userId)
   const identity = useIdentityQuery()
+  const signedIn = identity.data?.source === 'cloudflare_access'
   const zeroTrust = identity.data?.is_authenticated ?? false
+  const email = identity.data?.email
 
   return (
     <Section
@@ -308,11 +365,15 @@ function IdentitySection() {
         </Badge>
       </div>
       <p className="text-[13px] text-fg-3">
-        {zeroTrust
-          ? 'Signed in through Cloudflare Access. Your email is your user id.'
-          : identity.isError
-            ? "Couldn't check your sign-in, so the default user id is used."
-            : 'No Cloudflare Access sign-in was found, so the server’s DEFAULT_USER_ID (or "default") is used.'}
+        {signedIn
+          ? email && email !== userId
+            ? `Signed in as ${email}, which AGENTOS_USER_IDS maps to this user id.`
+            : 'Signed in through Cloudflare Access. Your email is your user id.'
+          : zeroTrust
+            ? 'Cloudflare Access sent your email. Your email is your user id.'
+            : identity.isError
+              ? "Couldn't check your sign-in, so the default user id is used."
+              : 'No Cloudflare Access sign-in was found, so the server’s DEFAULT_USER_ID (or "default") is used.'}
       </p>
     </Section>
   )
@@ -352,6 +413,8 @@ function AppearanceSection() {
 export function SettingsView() {
   const endpoint = useStore((state) => state.selectedEndpoint)
   const authToken = useStore((state) => state.authToken)
+  const signIn = useStore((state) => state.signIn)
+  const signInError = useRuntimeConfigQuery().data?.sign_in_error
 
   return (
     <>
@@ -363,7 +426,19 @@ export function SettingsView() {
         <PageBody className="max-w-3xl">
           {/* Keys reset the drafts when the saved values change. */}
           <ConnectionSection key={`endpoint-${endpoint}`} />
-          <TokenSection key={`token-${authToken}`} />
+          {signIn ? (
+            <SignInSection />
+          ) : (
+            <>
+              {signInError ? (
+                <p role="alert" className="text-[13px] text-bad">
+                  Sign-in isn&apos;t set up correctly on the UI server, so the
+                  token below is used. {signInError}
+                </p>
+              ) : null}
+              <TokenSection key={`token-${authToken}`} />
+            </>
+          )}
           <IdentitySection />
           <AppearanceSection />
           <p className="text-xs text-fg-3">AgentOS UI v{packageJson.version}</p>

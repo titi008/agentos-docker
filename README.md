@@ -188,6 +188,11 @@ Open [os.agno.com](https://os.agno.com), choose **Connect OS → Live**, enter y
 public URL, and enable token-based authorization. Save the public verification
 key in `.env` as `JWT_VERIFICATION_KEY`, with the entire multiline value in quotes.
 
+To use the bundled UI in `ui/` instead, let it issue the tokens: people sign in
+through Cloudflare Access and the UI server signs short-lived tokens that the API
+verifies with `JWT_VERIFICATION_KEY`. See
+[Sign in with Cloudflare Access](ui/README.md#sign-in-with-cloudflare-access).
+
 ### 3. Start the production services
 
 ```sh

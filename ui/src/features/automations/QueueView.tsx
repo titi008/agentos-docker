@@ -43,6 +43,7 @@ import {
   toDate
 } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { useStore } from '@/store'
 
 import { formatStamp, shortId } from './format'
 import { useComponentDirectory, type ResolvedComponent } from './model'
@@ -308,6 +309,18 @@ function StatFilter({
 
 /** Agno serves the whole queue API to admin tokens only, so a 403 replaces the page. */
 function AdminRequired() {
+  const signIn = useStore((state) => state.signIn)
+
+  if (signIn) {
+    return (
+      <EmptyState
+        icon={<LockKeyhole />}
+        title="The job queue is for admins"
+        description="Only admins can see and requeue background jobs. Admins are listed in AGENTOS_ADMIN_EMAILS on the UI server."
+      />
+    )
+  }
+
   return (
     <EmptyState
       icon={<LockKeyhole />}

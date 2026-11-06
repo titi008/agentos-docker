@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
+import type { SignInMode } from '@/app/api/config/route'
 import {
   AgentDetails,
   SessionEntry,
@@ -38,10 +39,21 @@ interface Store {
   saveEndpoint: (endpoint: string) => void
   /** Go back to the deployment default (or localhost when there is none). */
   resetEndpoint: () => void
+  /** Token entered in Settings; unused while the UI signs people in itself. */
   authToken: string
   setAuthToken: (authToken: string) => void
   userId: string
   setUserId: (userId: string) => void
+
+  /* Sign-in (not persisted) */
+  /** 'cloudflare_access' when this UI's server issues the tokens; null when one is entered in Settings. */
+  signIn: SignInMode | null
+  /** False until /api/config said which of the two applies. */
+  signInResolved: boolean
+  setSignIn: (signIn: SignInMode | null) => void
+  /** Short-lived token issued by this UI's server; kept in memory only. */
+  sessionToken: string | null
+  setSessionToken: (sessionToken: string | null) => void
 
   /* Workspace, loaded by the app shell */
   isEndpointActive: boolean
@@ -144,6 +156,12 @@ export const useStore = create<Store>()(
       setAuthToken: (authToken) => set({ authToken }),
       userId: 'default',
       setUserId: (userId) => set({ userId }),
+
+      signIn: null,
+      signInResolved: false,
+      setSignIn: (signIn) => set({ signIn, signInResolved: true }),
+      sessionToken: null,
+      setSessionToken: (sessionToken) => set({ sessionToken }),
 
       isEndpointActive: false,
       setIsEndpointActive: (isEndpointActive) => set({ isEndpointActive }),

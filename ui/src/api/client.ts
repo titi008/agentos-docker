@@ -203,6 +203,9 @@ export function getErrorMessage(error: unknown, endpoint?: string): string {
       const reason = error.detail ? ` ${asSentence(error.detail)}` : ''
       return `Your auth token doesn't have permission for this (403).${reason}`
     }
+    if (error.isAuthError && useStore.getState().signIn) {
+      return `The AgentOS server rejected your sign-in (${error.status}). If this keeps happening, its JWT_VERIFICATION_KEY doesn't match this UI's signing key.`
+    }
     if (error.isAuthError) {
       return `The server rejected the auth token (${error.status}). Check the token in Settings.`
     }
@@ -223,8 +226,14 @@ export function useApi() {
   const hydrated = useStore((state) => state.hydrated)
   const endpointResolved = useStore((state) => state.endpointResolved)
   const endpoint = useStore((state) => state.selectedEndpoint)
-  const authToken = useStore((state) => state.authToken)
+  const savedToken = useStore((state) => state.authToken)
+  const signIn = useStore((state) => state.signIn)
+  const signInResolved = useStore((state) => state.signInResolved)
+  const sessionToken = useStore((state) => state.sessionToken)
   const userId = useStore((state) => state.userId)
+
+  // Signed-in deployments use the short-lived token from this UI's server.
+  const authToken = signIn ? (sessionToken ?? '') : savedToken
 
   const ctx = useMemo<ApiContext>(
     () => ({ endpoint: normalizeEndpoint(endpoint), authToken, userId }),
@@ -244,8 +253,14 @@ export function useApi() {
 
   return {
     ctx,
-    // Wait for the host (saved, or the deployment default) so nothing is sent to a placeholder.
-    ready: hydrated && endpointResolved && Boolean(ctx.endpoint),
+    // Wait for the host (saved, or the deployment default) and, when people sign in,
+    // for their token, so nothing is sent to a placeholder or without credentials.
+    ready:
+      hydrated &&
+      endpointResolved &&
+      signInResolved &&
+      Boolean(ctx.endpoint) &&
+      (!signIn || Boolean(sessionToken)),
     request,
     key
   }

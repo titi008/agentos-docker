@@ -1,9 +1,11 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import { unwrapList, useApi } from '@/api/client'
+import { ApiError, unwrapList, useApi } from '@/api/client'
+import type { OperatorIdentityResponse } from '@/app/api/auth/me/route'
+import type { SessionTokenResponse } from '@/app/api/auth/token/route'
 import type { RuntimeConfigResponse } from '@/app/api/config/route'
 import { useStore } from '@/store'
 import type {
@@ -84,13 +86,9 @@ export function useApprovalsCountQuery() {
   })
 }
 
-export interface OperatorIdentity {
-  user_id: string
-  is_authenticated: boolean
-  source: 'cloudflare_zero_trust' | 'default'
-}
+export type OperatorIdentity = OperatorIdentityResponse
 
-/** Identity from this UI's own server (Cloudflare Access email or DEFAULT_USER_ID). */
+/** Identity from this UI's own server (Cloudflare Access sign-in, its email header, or DEFAULT_USER_ID). */
 export function useIdentityQuery() {
   return useQuery({
     queryKey: ['identity'],
@@ -102,6 +100,68 @@ export function useIdentityQuery() {
     },
     staleTime: Infinity,
     retry: 1
+  })
+}
+
+export const SESSION_TOKEN_KEY = ['session-token'] as const
+
+/** Renew the token this long before it expires. */
+const TOKEN_RENEW_MARGIN_MS = 2 * 60_000
+
+/** Cloudflare Access wants the person to log in again; only a page load can do that. */
+export class SignInRequiredError extends Error {
+  constructor(message = 'Your sign-in has ended. Sign in again to continue.') {
+    super(message)
+    this.name = 'SignInRequiredError'
+  }
+}
+
+const msUntilRenewal = (token: SessionTokenResponse | undefined) =>
+  token ? token.expires_at * 1000 - Date.now() - TOKEN_RENEW_MARGIN_MS : 0
+
+/**
+ * The short-lived AgentOS token this UI's server issues to the signed-in
+ * person, renewed before it expires (and when the tab comes back after one ran out).
+ */
+export function useSessionTokenQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: SESSION_TOKEN_KEY,
+    queryFn: async ({ signal }) => {
+      // Cloudflare answers an ended session with a redirect to its login page.
+      const response = await fetch('/api/auth/token', {
+        signal,
+        cache: 'no-store',
+        redirect: 'manual'
+      })
+      const isJson = response.headers
+        .get('content-type')
+        ?.includes('application/json')
+      if (
+        response.type === 'opaqueredirect' ||
+        response.status === 401 ||
+        (response.ok && !isJson)
+      ) {
+        throw new SignInRequiredError()
+      }
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          detail?: string
+        } | null
+        throw new Error(
+          body?.detail ?? `Sign-in failed (${response.status}). Try again.`
+        )
+      }
+      return (await response.json()) as SessionTokenResponse
+    },
+    enabled,
+    staleTime: (query) => Math.max(msUntilRenewal(query.state.data), 0),
+    refetchInterval: (query) =>
+      query.state.data
+        ? Math.max(msUntilRenewal(query.state.data), 10_000)
+        : false,
+    refetchIntervalInBackground: true,
+    retry: (failureCount, error) =>
+      !(error instanceof SignInRequiredError) && failureCount < 2
   })
 }
 
@@ -134,6 +194,7 @@ export function useWorkspaceBootstrap() {
   const workflows = useWorkflowsQuery()
   const approvalsCount = useApprovalsCountQuery()
   const identity = useIdentityQuery()
+  const queryClient = useQueryClient()
 
   const hydrated = useStore((state) => state.hydrated)
   const setIsEndpointActive = useStore((state) => state.setIsEndpointActive)
@@ -150,6 +211,11 @@ export function useWorkspaceBootstrap() {
   const applyServerDefaultEndpoint = useStore(
     (state) => state.applyServerDefaultEndpoint
   )
+  const signIn = useStore((state) => state.signIn)
+  const signInResolved = useStore((state) => state.signInResolved)
+  const setSignIn = useStore((state) => state.setSignIn)
+  const setSessionToken = useStore((state) => state.setSessionToken)
+  const sessionToken = useSessionTokenQuery(signIn === 'cloudflare_access')
 
   // Requests wait until the host is known; without a config the stored or built-in host is used.
   useEffect(() => {
@@ -167,11 +233,47 @@ export function useWorkspaceBootstrap() {
     applyServerDefaultEndpoint
   ])
 
+  // The config says whether this UI signs people in; without it, the Settings token is used.
+  useEffect(() => {
+    if (runtimeConfig.isSuccess) setSignIn(runtimeConfig.data.sign_in)
+    else if (runtimeConfig.isError) setSignIn(null)
+  }, [
+    runtimeConfig.isSuccess,
+    runtimeConfig.isError,
+    runtimeConfig.data,
+    setSignIn
+  ])
+
+  const issued = sessionToken.data
+  useEffect(() => {
+    if (!issued) return
+    setSessionToken(issued.token)
+    setUserId(issued.user_id)
+  }, [issued, setSessionToken, setUserId])
+
+  // Requests that failed on an expired token run again with the new one.
+  useEffect(() => {
+    if (!issued) return
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.state.status === 'error' &&
+        query.state.error instanceof ApiError &&
+        query.state.error.status === 401
+    })
+  }, [issued, queryClient])
+
+  // With sign-in, a token saved in Settings (often the server's master key) is never used: drop it.
+  useEffect(() => {
+    if (signIn && authToken) setAuthToken('')
+  }, [signIn, authToken, setAuthToken])
+
   // A build-time token seeds the connection when none is stored yet.
   useEffect(() => {
     const envToken = process.env.NEXT_PUBLIC_OS_SECURITY_KEY
-    if (hydrated && !authToken && envToken) setAuthToken(envToken)
-  }, [hydrated, authToken, setAuthToken])
+    if (hydrated && signInResolved && !signIn && !authToken && envToken) {
+      setAuthToken(envToken)
+    }
+  }, [hydrated, signInResolved, signIn, authToken, setAuthToken])
 
   useEffect(() => {
     setIsEndpointLoading(!hydrated || health.isPending)
@@ -194,7 +296,10 @@ export function useWorkspaceBootstrap() {
     () => setPendingApprovalsCount(approvalsCount.data ?? 0),
     [approvalsCount.data, setPendingApprovalsCount]
   )
+  // Signed-in people get their id with the token; otherwise it comes from /api/auth/me.
   useEffect(() => {
-    if (hydrated && identity.data?.user_id) setUserId(identity.data.user_id)
-  }, [hydrated, identity.data?.user_id, setUserId])
+    if (hydrated && signInResolved && !signIn && identity.data?.user_id) {
+      setUserId(identity.data.user_id)
+    }
+  }, [hydrated, signInResolved, signIn, identity.data?.user_id, setUserId])
 }
