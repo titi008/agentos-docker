@@ -5,6 +5,7 @@ App Settings
 Shared runtime objects for the platform.
 """
 
+import re
 from functools import cache
 from os import getenv
 from typing import Any
@@ -108,6 +109,21 @@ def get_agent_model(agent_id: str, default_factory: Any) -> Any:
 
 get_team_model = get_agent_model
 
+# A model picked for one chat is kept in the chat's session state together with
+# the ID of the agent or team the chat is with.
+CHAT_MODEL_KEY = "model_override"
+CHAT_MODEL_TARGET_KEY = "model_override_for"
+_RUN_PATH = re.compile(r"^/(?:agents|teams)/([^/]+)/runs(?:/|$)")
+
+
+def chat_model_state(path: str, model_id: str | None) -> dict[str, str] | None:
+    """Session state for a model picked in a chat, if ``path`` runs an agent or team."""
+    model_id = (model_id or "").strip()
+    match = _RUN_PATH.match(path)
+    if not model_id or not match:
+        return None
+    return {CHAT_MODEL_KEY: model_id, CHAT_MODEL_TARGET_KEY: match.group(1)}
+
 
 def model_override_hook(
     run_context: Any = None,
@@ -115,20 +131,23 @@ def model_override_hook(
     team: Any = None,
     **kwargs: Any,
 ) -> None:
-    """Pre-hook that checks for chat-level model overrides in session_state or metadata."""
-    target = agent or team or getattr(run_context, "agent", None) or getattr(run_context, "team", None)
-    session_state = getattr(run_context, "session_state", None)
-    if isinstance(session_state, dict):
-        override = session_state.get("model_override")
-        if override and target:
-            target.model = model_from_id(override)
-            return
+    """Pre-hook that applies the model picked for a chat to the agent or team the chat is with.
 
-    metadata = getattr(run_context, "metadata", None)
-    if isinstance(metadata, dict):
-        override = metadata.get("model_override")
-        if override and target:
-            target.model = model_from_id(override)
+    Team members receive a copy of the team's session state, so the target check
+    keeps delegated members on their own saved models. The same keys are honoured
+    in run metadata for API callers.
+    """
+    target = agent or team or getattr(run_context, "agent", None) or getattr(run_context, "team", None)
+    target_id = getattr(target, "id", None)
+    if target is None or not target_id:
+        return
+    for source in (getattr(run_context, "session_state", None), getattr(run_context, "metadata", None)):
+        if not isinstance(source, dict):
+            continue
+        model_id = source.get(CHAT_MODEL_KEY)
+        if model_id and source.get(CHAT_MODEL_TARGET_KEY) == target_id:
+            target.model = model_from_id(model_id)
+            return
 
 
 def _resolve_provider(tier_env_prefix: str = "") -> str:

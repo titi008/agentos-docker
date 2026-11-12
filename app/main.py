@@ -22,9 +22,11 @@ from agents.researcher import market_researcher
 from agents.tech_specialist import tech_specialist
 from app.company import products
 from app.interfaces import attach_interfaces, mcp_auth
+from app.patches import apply_patches
 from app.pricing import compute_cost_breakdown, pricing_manager
 from app.registry import registry, shared_knowledge, shared_learning
 from app.settings import (
+    chat_model_state,
     get_available_models,
     manager_model,
     model_from_id,
@@ -32,6 +34,8 @@ from app.settings import (
 )
 from db import get_postgres_db
 from teams.solo_operations import solo_operations_team
+
+apply_patches()
 
 runtime_env = getenv("RUNTIME_ENV", "prd")
 agentos_url = getenv("AGENTOS_URL", "http://127.0.0.1:8000")
@@ -60,9 +64,9 @@ async def user_identity_middleware(request: Request, call_next: Callable[[Reques
     if user_header and not getattr(request.state, "user_id", None):
         request.state.user_id = user_header.strip()
 
-    model_override = request.headers.get("x-model-override")
-    if model_override:
-        request.state.session_state = {"model_override": model_override.strip()}
+    chat_model = chat_model_state(request.url.path, request.headers.get("x-model-override"))
+    if chat_model:
+        request.state.session_state = chat_model
 
     return await call_next(request)
 

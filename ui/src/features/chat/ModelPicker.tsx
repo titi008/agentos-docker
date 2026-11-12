@@ -101,8 +101,12 @@ function ModelOptions({
       return
     }
     setSelectedModel(id)
+    const members =
+      target.kind === 'team'
+        ? ' Agents the team delegates to keep their own models.'
+        : ''
     toast.success(`Model for this chat set to ${id}`, {
-      description: `Used for the messages you send in this chat from now on. The ${kindLabel}'s saved model doesn't change.`
+      description: `Used for the messages you send in this chat from now on. The ${kindLabel}'s saved model doesn't change.${members}`
     })
   }
 

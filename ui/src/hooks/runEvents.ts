@@ -277,7 +277,10 @@ function applyNestedEvent(
   if (name.startsWith('ToolCall')) {
     return applyToolEvent(message, event, memberName(event))
   }
-  if (name === 'RunContent' && typeof event.content === 'string') {
+  if (
+    (name === 'RunContent' || name === 'RunIntermediateContent') &&
+    typeof event.content === 'string'
+  ) {
     // Workflow steps stream their agents' output live; the final output
     // replaces it on WorkflowCompleted. Team members' output is kept aside.
     if (state.kind === 'workflow') {
