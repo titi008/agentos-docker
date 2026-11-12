@@ -78,6 +78,21 @@ class TestDelegationPatch(unittest.TestCase):
             mock_log.assert_called_once()
             self.assertIn("empty response", result or "")
 
+    def test_claude_image_formatting_with_png(self) -> None:
+        from agno.media import Image
+        from agno.utils.models.claude import _format_image_for_message
+
+        png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+        img = Image(content=png_bytes)
+        formatted = _format_image_for_message(img)
+
+        self.assertIsNotNone(formatted)
+        assert formatted is not None
+        self.assertEqual(formatted.get("type"), "image")
+        source = formatted.get("source", {})
+        self.assertEqual(source.get("type"), "base64")
+        self.assertEqual(source.get("media_type"), "image/png")
+
 
 if __name__ == "__main__":
     unittest.main()

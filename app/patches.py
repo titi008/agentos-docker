@@ -20,6 +20,39 @@ def apply_patches() -> None:
     """Apply framework-level runtime patches."""
     _patch_intermediate_run_content_event_hierarchy()
     _patch_team_delegation_error_handling()
+    _patch_claude_image_support()
+
+
+def _patch_claude_image_support() -> None:
+    """Ensure image type guessing is available for Claude in Python 3.13+.
+
+    Python 3.13+ removed 'imghdr'. Agno falls back to 'import filetype'. If filetype
+    is not installed in the environment, provide a built-in magic-byte detector so
+    Claude image formatting does not fail with an ImportError.
+    """
+    import sys
+    from types import ModuleType, SimpleNamespace
+
+    try:
+        import filetype  # type: ignore[import-untyped] # noqa: F401
+    except ImportError:
+
+        def _guess_image_type(data: Any) -> Any:
+            if not isinstance(data, (bytes, bytearray)) or len(data) < 12:
+                return None
+            if data.startswith(b"\x89PNG\r\n\x1a\n"):
+                return SimpleNamespace(extension="png", mime="image/png")
+            if data.startswith(b"\xff\xd8\xff"):
+                return SimpleNamespace(extension="jpeg", mime="image/jpeg")
+            if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+                return SimpleNamespace(extension="gif", mime="image/gif")
+            if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+                return SimpleNamespace(extension="webp", mime="image/webp")
+            return None
+
+        filetype_mod = ModuleType("filetype")
+        filetype_mod.guess = _guess_image_type  # type: ignore[attr-defined]
+        sys.modules["filetype"] = filetype_mod
 
 
 def _patch_intermediate_run_content_event_hierarchy() -> None:

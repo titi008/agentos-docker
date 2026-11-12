@@ -110,6 +110,8 @@ fastmcp==4.1.4
     # via agno
 fastmcp-slim==4.1.4
     # via fastmcp
+filetype==1.2.0
+    # via agentos (pyproject.toml)
 fonttools==4.68.0
     # via agno
 frozenlist==1.8.0
