@@ -26,6 +26,11 @@ How you work:
 tech_specialist = Agent(
     id="tech-specialist",
     name="Tech Specialist",
+    role="Automations, code snippets, API integrations, deployments, and debugging.",
+    description=(
+        "Use for scripts, Docker or deployment configs, API integrations, debugging, "
+        "and verifying current library or SDK documentation on the web."
+    ),
     model=get_agent_model("tech-specialist", reasoning_model),
     pre_hooks=[model_override_hook],
     db=get_postgres_db(),

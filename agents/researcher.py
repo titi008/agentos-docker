@@ -26,6 +26,11 @@ How you work:
 market_researcher = Agent(
     id="market-researcher",
     name="Market Researcher",
+    role="Web research, competitive intelligence, pricing benchmarks, and industry trends.",
+    description=(
+        "Use for any question needing live web search, page extraction, market data, "
+        "competitor analysis, pricing benchmarks, or cited external sources."
+    ),
     model=get_agent_model("market-researcher", fast_model),
     pre_hooks=[model_override_hook],
     db=get_postgres_db(),

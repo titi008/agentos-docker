@@ -26,6 +26,11 @@ How you work:
 content_strategist = Agent(
     id="content-strategist",
     name="Content Strategist",
+    role="Marketing copy, newsletters, social posts, and blog outlines.",
+    description=(
+        "Use for drafting positioning copy, landing pages, launch emails, "
+        "newsletters, social posts, and editorial outlines."
+    ),
     model=get_agent_model("content-strategist", fast_model),
     pre_hooks=[model_override_hook],
     db=get_postgres_db(),
